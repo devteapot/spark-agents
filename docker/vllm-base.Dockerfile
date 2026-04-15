@@ -34,4 +34,5 @@ RUN pip install --upgrade pip setuptools wheel packaging && \
     pip install \
         "${VLLM_CUDA_WHEEL_URL}" && \
     pip install --upgrade --no-deps \
-        "transformers>=5.5.0,<5.6"
+        "transformers>=5.5.0,<5.6" \
+        "huggingface_hub>=1.10,<1.11"
