@@ -8,6 +8,7 @@ ENV PIP_NO_CACHE_DIR=1
 ENV PYTHONUNBUFFERED=1
 ENV HF_HOME=/root/.cache/huggingface
 ENV HUGGINGFACE_HUB_CACHE=/root/.cache/huggingface/hub
+ENV VLLM_VENV=/opt/vllm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -20,12 +21,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-venv && \
     rm -rf /var/lib/apt/lists/*
 
-RUN python3 -m pip install --break-system-packages --upgrade setuptools wheel packaging && \
-    python3 -m pip install --break-system-packages \
+RUN python3 -m venv "${VLLM_VENV}"
+
+ENV PATH="${VLLM_VENV}/bin:${PATH}"
+
+RUN pip install --upgrade pip setuptools wheel packaging && \
+    pip install \
         --index-url "${TORCH_CUDA_INDEX_URL}" \
         torch==2.10.0 \
         torchaudio==2.10.0 \
         torchvision==0.25.0 && \
-    python3 -m pip install --break-system-packages \
+    pip install \
         "${VLLM_CUDA_WHEEL_URL}" \
         "transformers>=5.5.0,<5.6"
