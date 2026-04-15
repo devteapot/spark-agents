@@ -8,7 +8,7 @@ This is **not** an application. It is a configuration + deployment repo for a tw
 
 - **DGX Spark** (`carlid@slopinator-s-1.local`) - runs two `vLLM` services:
   - `vllm-supergemma.service` on `:8001`
-  - `vllm-qwen.service` on `:8002`
+  - `vllm-coder.service` on `:8002`
 - **MacBook Air** (`sloppy@sloppy-mba.local`) - runs Hermes, OpenClaw, and a local `LiteLLM` router on `127.0.0.1:4000`
 
 The repo is cloned to both machines and scripts are run on whichever side they target. Editing configs or scripts means: commit, push, pull on the other box, then rerun `mba-deploy.sh` on the MBA so the staged runtime configs in `~/.spark-agents/` are refreshed and the live configs in `~/.hermes/` + `~/.openclaw/` are replaced.
@@ -19,7 +19,7 @@ All scripts live in `scripts/` and are idempotent.
 
 | Command | Where to run | What it does |
 |---|---|---|
-| `./scripts/spark-setup.sh` | Spark, once | Installs `hf` via pipx, validates Docker availability, downloads the NVFP4/FP8 model repos into `/srv/models`, builds custom Spark-side `vLLM` container images, writes the Spark systemd units, `daemon-reload`, and enables them. |
+| `./scripts/spark-setup.sh` | Spark, once | Installs `hf` via pipx, validates Docker availability, downloads the Spark model repos into `/srv/models`, builds custom Spark-side `vLLM` container images, writes the Spark systemd units, `daemon-reload`, and enables them. |
 | `./scripts/mba-deploy.sh` | MBA, after config/script edits | Stages `hermes/`, `openclaw/`, and `litellm/` configs into `~/.spark-agents`, restarts LiteLLM in the active mode, copies the live configs into `~/.hermes/` + `~/.openclaw/`, restarts Hermes/OpenClaw once, and installs `spark-*.sh` into `~/bin`. |
 | `spark-resume.sh` | MBA, daily | Starts both Spark `vLLM` services over SSH using a single remote `sudo bash -se` path, waits for `/v1/models`, runs a basic chat + tool-call health check, then switches LiteLLM into `agent-mode`. Hermes/OpenClaw stay running. |
 | `spark-pause.sh` | MBA, before benchmarking | Switches LiteLLM into `benchmark-mode` first, then stops both Spark `vLLM` services over SSH. Hermes/OpenClaw stay running. |
@@ -40,7 +40,7 @@ The enforcement point is the MBA-side `LiteLLM` router:
   - wait for health
   - switch LiteLLM to `agent-mode`
   - `general` routes to Spark SuperGemma NVFP4
-  - `coder` routes to Spark Qwen FP8
+  - `coder` routes to Spark Nemotron Super NVFP4
 - **Benchmark mode** (`spark-pause.sh`):
   - switch LiteLLM to `benchmark-mode`
   - stop Spark `vLLM` services
@@ -79,6 +79,6 @@ Repo configs live under:
 Spark-local model repos live under `/srv/models`:
 
 - `/srv/models/supergemma4-nvfp4`
-- `/srv/models/qwen3-coder-next-fp8`
+- `/srv/models/nemotron-super-nvfp4`
 
 The systemd unit templates in `systemd/` render those paths into Docker-backed `vLLM` service definitions. The images are built from the repo Dockerfiles in `docker/`. If you change the download location, update both `spark-setup.sh` and the rendered service templates.

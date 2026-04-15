@@ -14,18 +14,21 @@ require_command python3
 ensure_runtime_dirs
 ensure_litellm_installed
 
-log "Starting Spark Qwen vLLM first..."
+log "Starting Spark coder vLLM first..."
 spark_remote_sudo <<'REMOTE_EOF'
 systemctl daemon-reload
-systemctl reset-failed vllm-qwen.service vllm-supergemma.service || true
+systemctl reset-failed vllm-coder.service vllm-supergemma.service vllm-qwen.service || true
+systemctl stop vllm-qwen.service >/dev/null 2>&1 || true
 pkill -f '/opt/spark-agents-vllm/bin/vllm serve /srv/models/qwen3-coder-next-fp8' || true
+pkill -f '/opt/spark-agents-vllm/bin/vllm serve /srv/models/nemotron-super-nvfp4' || true
 pkill -f '/opt/spark-agents-vllm/bin/vllm serve /srv/models/supergemma4-nvfp4' || true
-systemctl restart vllm-qwen.service
+docker rm -f spark-vllm-qwen spark-vllm-coder >/dev/null 2>&1 || true
+systemctl restart vllm-coder.service
 REMOTE_EOF
 
-log "Waiting for Spark Qwen vLLM..."
-wait_for_models_endpoint "${SPARK_QWEN_V1_URL}" "Spark Qwen vLLM" 300
-healthcheck_tool_call "${SPARK_QWEN_V1_URL}" "${QWEN_MODEL_ID}" "Spark Qwen vLLM"
+log "Waiting for Spark coder vLLM..."
+wait_for_models_endpoint "${SPARK_CODER_V1_URL}" "Spark coder vLLM" 300
+healthcheck_tool_call "${SPARK_CODER_V1_URL}" "${CODER_MODEL_ID}" "Spark coder vLLM"
 
 log "Starting Spark SuperGemma vLLM..."
 spark_remote_sudo <<'REMOTE_EOF'
@@ -43,7 +46,7 @@ echo ""
 log "Spark-local serving is back."
 log "  LiteLLM mode: agent-mode"
 log "  general -> ${SUPERGEMMA_MODEL_ID}"
-log "  coder   -> ${QWEN_MODEL_ID}"
+log "  coder   -> ${CODER_MODEL_ID}"
 
 if ! pgrep -f "hermes" > /dev/null 2>&1; then
     warn "Hermes is not running. mba-deploy.sh starts it the first time."

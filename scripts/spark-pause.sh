@@ -18,7 +18,8 @@ restart_litellm "benchmark-mode"
 
 log "Stopping Spark vLLM services..."
 spark_remote_sudo <<'REMOTE_EOF'
-systemctl stop vllm-supergemma.service vllm-qwen.service
+systemctl stop vllm-supergemma.service vllm-coder.service
+systemctl stop vllm-qwen.service >/dev/null 2>&1 || true
 REMOTE_EOF
 
 echo ""

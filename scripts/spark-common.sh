@@ -7,7 +7,7 @@ PATH="${HOME}/.local/bin:${HOME}/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
 export PATH
 
 SPARK_SUPERGEMMA_V1_URL="http://${SPARK_HOST}:8001/v1"
-SPARK_QWEN_V1_URL="http://${SPARK_HOST}:8002/v1"
+SPARK_CODER_V1_URL="http://${SPARK_HOST}:8002/v1"
 LITELLM_BASE_URL="${LITELLM_BASE_URL:-http://127.0.0.1:4000}"
 LITELLM_V1_URL="${LITELLM_V1_URL:-${LITELLM_BASE_URL}/v1}"
 
@@ -21,7 +21,7 @@ LITELLM_PID_FILE="${LITELLM_RUNTIME_DIR}/litellm.pid"
 LITELLM_LOG_FILE="${LITELLM_LOG_FILE:-/tmp/litellm.log}"
 
 SUPERGEMMA_MODEL_ID="AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4"
-QWEN_MODEL_ID="Qwen/Qwen3-Coder-Next-FP8"
+CODER_MODEL_ID="nvidia/nemotron-3-super"
 GENERAL_CLOUD_MODEL_ID="openrouter/google/gemini-2.5-flash"
 CODER_CLOUD_MODEL_ID="openrouter/anthropic/claude-sonnet-4-5"
 

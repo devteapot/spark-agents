@@ -7,9 +7,12 @@ model_list:
 
   - model_name: coder
     litellm_params:
-      model: openai/Qwen/Qwen3-Coder-Next-FP8
+      model: openai/nvidia/nemotron-3-super
       api_base: http://slopinator-s-1.local:8002/v1
       api_key: litellm-local
+      extra_body:
+        chat_template_kwargs:
+          force_nonempty_content: true
 
   - model_name: general-cloud
     litellm_params:

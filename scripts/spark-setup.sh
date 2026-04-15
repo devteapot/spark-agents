@@ -6,7 +6,7 @@
 #   2. Validate Docker + NVIDIA container runtime availability
 #   3. Create /srv/models and download the two HF model repos
 #   4. Build the Spark-side vLLM container images
-#   5. Install the Spark-side systemd units for SuperGemma and Qwen
+#   5. Install the Spark-side systemd units for SuperGemma and coder
 #   6. Enable the units so spark-resume.sh / spark-pause.sh can manage them
 #
 # Usage:
@@ -19,20 +19,20 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODEL_DIR="/srv/models"
 STATE_DIR="/srv/spark-agents"
 SUPERGEMMA_DIR="${MODEL_DIR}/supergemma4-nvfp4"
-QWEN_DIR="${MODEL_DIR}/qwen3-coder-next-fp8"
+CODER_DIR="${MODEL_DIR}/nemotron-super-nvfp4"
 SUPERGEMMA_CACHE_DIR="${STATE_DIR}/cache/supergemma"
-QWEN_CACHE_DIR="${STATE_DIR}/cache/qwen"
+CODER_CACHE_DIR="${STATE_DIR}/cache/coder"
 SYSTEMD_DIR="/etc/systemd/system"
 DOCKER_BIN="$(command -v docker || true)"
 TORCH_CUDA_INDEX_URL="https://download.pytorch.org/whl/cu130"
 VLLM_CUDA_WHEEL_URL="https://wheels.vllm.ai/2a69949bdadf0e8942b7a1619b229cb475beef20/vllm-0.19.0%2Bcu130-cp38-abi3-manylinux_2_35_aarch64.whl"
 SUPERGEMMA_MODEL_REPO="AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4"
-QWEN_MODEL_REPO="Qwen/Qwen3-Coder-Next-FP8"
+CODER_MODEL_REPO="nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4"
 MODELOPT_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/modelopt_patched.py"
 SERVING_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/serving_chat_patched.py"
 VLLM_BASE_IMAGE="spark-agents/vllm-base:cu130"
 SUPERGEMMA_IMAGE="spark-agents/vllm-supergemma:local"
-QWEN_IMAGE="spark-agents/vllm-qwen:local"
+CODER_IMAGE="spark-agents/vllm-coder:local"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -54,9 +54,9 @@ render_template() {
     SUPERGEMMA_DIR_RENDER="${SUPERGEMMA_DIR}" \
     SUPERGEMMA_CACHE_DIR_RENDER="${SUPERGEMMA_CACHE_DIR}" \
     SUPERGEMMA_IMAGE_RENDER="${SUPERGEMMA_IMAGE}" \
-    QWEN_DIR_RENDER="${QWEN_DIR}" \
-    QWEN_CACHE_DIR_RENDER="${QWEN_CACHE_DIR}" \
-    QWEN_IMAGE_RENDER="${QWEN_IMAGE}" \
+    CODER_DIR_RENDER="${CODER_DIR}" \
+    CODER_CACHE_DIR_RENDER="${CODER_CACHE_DIR}" \
+    CODER_IMAGE_RENDER="${CODER_IMAGE}" \
     python3 - <<'PY' > "${tmp_file}"
 import os
 from pathlib import Path
@@ -67,9 +67,9 @@ replacements = {
     "__SUPERGEMMA_MODEL_PATH__": os.environ["SUPERGEMMA_DIR_RENDER"],
     "__SUPERGEMMA_CACHE_DIR__": os.environ["SUPERGEMMA_CACHE_DIR_RENDER"],
     "__SUPERGEMMA_IMAGE__": os.environ["SUPERGEMMA_IMAGE_RENDER"],
-    "__QWEN_MODEL_PATH__": os.environ["QWEN_DIR_RENDER"],
-    "__QWEN_CACHE_DIR__": os.environ["QWEN_CACHE_DIR_RENDER"],
-    "__QWEN_IMAGE__": os.environ["QWEN_IMAGE_RENDER"],
+    "__CODER_MODEL_PATH__": os.environ["CODER_DIR_RENDER"],
+    "__CODER_CACHE_DIR__": os.environ["CODER_CACHE_DIR_RENDER"],
+    "__CODER_IMAGE__": os.environ["CODER_IMAGE_RENDER"],
 }
 for needle, value in replacements.items():
     text = text.replace(needle, value)
@@ -142,7 +142,7 @@ if [ ! -d "${STATE_DIR}" ]; then
     sudo chmod 755 "${STATE_DIR}"
 fi
 
-sudo mkdir -p "${SUPERGEMMA_DIR}" "${QWEN_DIR}" "${SUPERGEMMA_CACHE_DIR}" "${QWEN_CACHE_DIR}"
+sudo mkdir -p "${SUPERGEMMA_DIR}" "${CODER_DIR}" "${SUPERGEMMA_CACHE_DIR}" "${CODER_CACHE_DIR}"
 sudo chown -R "$(id -un):$(id -gn)" "${MODEL_DIR}" "${STATE_DIR}"
 
 log "Downloading ${SUPERGEMMA_MODEL_REPO} into ${SUPERGEMMA_DIR}..."
@@ -150,10 +150,15 @@ hf download \
     "${SUPERGEMMA_MODEL_REPO}" \
     --local-dir "${SUPERGEMMA_DIR}"
 
-log "Downloading ${QWEN_MODEL_REPO} into ${QWEN_DIR}..."
+log "Downloading ${CODER_MODEL_REPO} into ${CODER_DIR}..."
 hf download \
-    "${QWEN_MODEL_REPO}" \
-    --local-dir "${QWEN_DIR}"
+    "${CODER_MODEL_REPO}" \
+    --local-dir "${CODER_DIR}"
+
+if [ ! -f "${CODER_DIR}/super_v3_reasoning_parser.py" ]; then
+    err "Expected reasoning parser not found at ${CODER_DIR}/super_v3_reasoning_parser.py after download."
+    exit 1
+fi
 
 build_image \
     "${VLLM_BASE_IMAGE}" \
@@ -169,26 +174,32 @@ build_image \
     --build-arg "SERVING_PATCH_URL=${SERVING_PATCH_URL}"
 
 build_image \
-    "${QWEN_IMAGE}" \
-    "docker/vllm-qwen.Dockerfile" \
+    "${CODER_IMAGE}" \
+    "docker/vllm-coder.Dockerfile" \
     --build-arg "BASE_IMAGE=${VLLM_BASE_IMAGE}"
 
 log "Installing Spark systemd units..."
 render_template "${PROJECT_DIR}/systemd/vllm-supergemma.service.tpl" "${SYSTEMD_DIR}/vllm-supergemma.service"
-render_template "${PROJECT_DIR}/systemd/vllm-qwen.service.tpl" "${SYSTEMD_DIR}/vllm-qwen.service"
+render_template "${PROJECT_DIR}/systemd/vllm-coder.service.tpl" "${SYSTEMD_DIR}/vllm-coder.service"
+
+if [ -f "${SYSTEMD_DIR}/vllm-qwen.service" ]; then
+    log "Removing legacy vllm-qwen.service..."
+    sudo systemctl disable --now vllm-qwen.service >/dev/null 2>&1 || true
+    sudo rm -f "${SYSTEMD_DIR}/vllm-qwen.service"
+fi
 
 log "Reloading systemd and enabling vLLM services..."
 sudo systemctl daemon-reload
-sudo systemctl enable vllm-supergemma.service vllm-qwen.service
+sudo systemctl enable vllm-supergemma.service vllm-coder.service
 
 echo ""
 log "Setup complete."
 log "  SuperGemma NVFP4 path: ${SUPERGEMMA_DIR}"
-log "  Qwen FP8 path:        ${QWEN_DIR}"
+log "  Nemotron coder path:  ${CODER_DIR}"
 log "  State/cache root:     ${STATE_DIR}"
 log "  Base image:           ${VLLM_BASE_IMAGE}"
 log "  SuperGemma image:     ${SUPERGEMMA_IMAGE}"
-log "  Qwen image:           ${QWEN_IMAGE}"
+log "  Coder image:          ${CODER_IMAGE}"
 log ""
 log "Next steps:"
 log "  1. On MBA, run:    ./scripts/mba-deploy.sh"

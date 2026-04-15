@@ -15,7 +15,7 @@ MBA (sloppy@sloppy-mba.local)
 
 LiteLLM routes:
   agent-mode     -> Spark vLLM SuperGemma (8001)
-                 -> Spark vLLM Qwen (8002)
+                 -> Spark vLLM coder (8002)
   benchmark-mode -> OpenRouter hosted models
 ```
 
@@ -34,7 +34,7 @@ Hidden cloud aliases stay available behind the router for hosted escape hatches:
 Spark-local models:
 
 - `AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4`
-- `Qwen/Qwen3-Coder-Next-FP8`
+- `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4`
 
 Hosted benchmark-mode models:
 
@@ -54,7 +54,7 @@ cd ~/spark-agents
 This downloads both model repos under `/srv/models`, builds the Spark-side `vLLM` container images, and installs:
 
 - `vllm-supergemma.service`
-- `vllm-qwen.service`
+- `vllm-coder.service`
 
 The two Spark services still bind directly on the host at `:8001` and `:8002`, but they now run as Docker containers under systemd instead of using a host-managed Python runtime.
 
