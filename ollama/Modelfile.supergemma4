@@ -1,0 +1,27 @@
+# SuperGemma4 26B Abliterated Multimodal Q8_0
+# Role: General intelligence agent (planning, reasoning, tool use, conversation)
+# Source: https://huggingface.co/Jiunsong/supergemma4-26b-abliterated-multimodal-gguf-8bit
+#
+# Download the GGUF first:
+#   huggingface-cli download Jiunsong/supergemma4-26b-abliterated-multimodal-gguf-8bit \
+#     supergemma4-26b-abliterated-multimodal-Q8_0.gguf \
+#     --local-dir /home/carlid/models/supergemma4-26b
+#
+# Then build:
+#   ollama create supergemma4:26b-q8 -f Modelfile.supergemma4
+
+FROM /home/carlid/models/supergemma4-26b/supergemma4-26b-abliterated-multimodal-Q8_0.gguf
+
+# Context window — 8192 keeps KV cache lean for dual-agent concurrency
+PARAMETER num_ctx 8192
+
+# Temperature — slightly below default for more reliable tool calling
+PARAMETER temperature 0.6
+
+# Repeat penalty — helps with structured/tool output
+PARAMETER repeat_penalty 1.1
+
+# Keep model loaded (managed by scripts, not timeout)
+PARAMETER num_keep -1
+
+SYSTEM """You are a highly capable AI assistant with strong planning, reasoning, and tool-use abilities. You think step by step, use tools precisely, and communicate clearly. When given a task, break it into actionable steps and execute them methodically. Always verify your work before reporting completion."""

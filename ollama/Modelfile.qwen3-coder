@@ -1,0 +1,30 @@
+# Qwen3-Coder-Next 80B-A3B Q6_K
+# Role: Coding agent (agentic coding loops, file editing, test running)
+# Source: https://huggingface.co/unsloth/Qwen3-Coder-Next-GGUF
+#
+# Download the GGUF first:
+#   huggingface-cli download unsloth/Qwen3-Coder-Next-GGUF \
+#     Qwen3-Coder-Next-Q6_K.gguf \
+#     --local-dir /home/carlid/models/qwen3-coder-next
+#
+# Then build:
+#   ollama create qwen3-coder-next:q6k -f Modelfile.qwen3-coder
+
+FROM /home/carlid/models/qwen3-coder-next/Qwen3-Coder-Next-Q6_K.gguf
+
+# Context window — 32768 for multi-file coding context while keeping memory in check
+PARAMETER num_ctx 32768
+
+# Temperature — low for precise code generation
+PARAMETER temperature 0.3
+
+# Top-p — slightly tighter for code
+PARAMETER top_p 0.9
+
+# Repeat penalty
+PARAMETER repeat_penalty 1.05
+
+# Keep model loaded (managed by scripts, not timeout)
+PARAMETER num_keep -1
+
+SYSTEM """You are an expert software engineer and coding agent. You write clean, efficient, well-tested code. When working on tasks, you read existing code carefully, plan your changes, implement them precisely, and verify correctness. You follow existing code conventions and explain your reasoning when making architectural decisions."""

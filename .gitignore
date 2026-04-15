@@ -1,0 +1,13 @@
+# Model files (huge, download via setup script)
+*.gguf
+models/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files created by deploy scripts
+*.bak.*
