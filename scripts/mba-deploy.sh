@@ -96,6 +96,27 @@ raise SystemExit(1)
 PY
 }
 
+render_openclaw_runtime_config() {
+    python3 - "${RUNTIME_OPENCLAW_DIR}/config.json" "${HOME}/.openclaw/openclaw.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+src = Path(sys.argv[1])
+dst = Path(sys.argv[2])
+
+data = json.loads(src.read_text())
+data.pop("_comment", None)
+
+gateway = data.setdefault("gateway", {})
+gateway.setdefault("mode", "local")
+gateway.setdefault("bind", "loopback")
+gateway.setdefault("port", 18789)
+
+dst.write_text(json.dumps(data, indent=2) + "\n")
+PY
+}
+
 if [ ! -f "${HERMES_REPO_CONFIG}" ] || [ ! -f "${OPENCLAW_REPO_CONFIG}" ] || [ ! -f "${LITELLM_AGENT_REPO_CONFIG}" ] || [ ! -f "${LITELLM_BENCHMARK_REPO_CONFIG}" ]; then
     err "Repo config files are missing. Run this from inside the spark-agents checkout."
     exit 1
@@ -157,7 +178,8 @@ if [ -f "${HOME}/.openclaw/config.json" ]; then
     cp "${HOME}/.openclaw/config.json" "${HOME}/.openclaw/config.json.bak.$(date +%Y%m%d_%H%M%S)"
 fi
 cp "${RUNTIME_OPENCLAW_DIR}/config.json" "${HOME}/.openclaw/config.json"
-log "Installed ~/.openclaw/config.json"
+render_openclaw_runtime_config
+log "Installed ~/.openclaw/config.json and rendered ~/.openclaw/openclaw.json"
 
 section "6/7  Restarting agents on the new router-backed configs"
 if hermes_gateway_configured; then
@@ -165,9 +187,9 @@ if hermes_gateway_configured; then
 else
     log "Hermes gateway not configured; skipping Hermes background start."
 fi
-stop_process_if_running "openclaw" "openclaw stop 2>/dev/null"
+stop_process_if_running "openclaw" "openclaw gateway stop 2>/dev/null"
 
-start_process_if_needed "openclaw" "openclaw start" "/tmp/openclaw.log"
+start_process_if_needed "openclaw" "openclaw gateway run" "/tmp/openclaw.log"
 
 section "7/7  Installing operational scripts"
 mkdir -p "${HOME}/bin"
