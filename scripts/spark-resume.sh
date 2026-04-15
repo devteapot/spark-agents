@@ -13,7 +13,6 @@ require_command python3
 
 ensure_runtime_dirs
 ensure_litellm_installed
-require_openrouter_api_key > /dev/null
 
 log "Starting Spark vLLM services..."
 spark_remote_sudo <<'REMOTE_EOF'

@@ -293,7 +293,16 @@ restart_litellm() {
         return 1
     }
 
-    openrouter_key="$(require_openrouter_api_key)" || return 1
+    if openrouter_key="$(resolve_openrouter_api_key 2>/dev/null)"; then
+        :
+    elif [ "${mode}" = "agent-mode" ]; then
+        openrouter_key="missing-openrouter-key"
+        warn "OPENROUTER_API_KEY not found; starting agent-mode with local routes only."
+        warn "Hidden cloud fallbacks will stay unavailable until a real key is configured."
+    else
+        require_openrouter_api_key > /dev/null || return 1
+        openrouter_key="$(resolve_openrouter_api_key)"
+    fi
 
     cp "${source_config}" "${LITELLM_ACTIVE_CONFIG}"
     printf '%s\n' "${mode}" > "${LITELLM_MODE_FILE}"

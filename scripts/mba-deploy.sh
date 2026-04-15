@@ -84,7 +84,6 @@ require_command hermes
 require_command python3
 ensure_runtime_dirs
 ensure_litellm_installed
-require_openrouter_api_key > /dev/null
 
 section "1/7  Staging runtime configs"
 mkdir -p "${RUNTIME_HERMES_DIR}" "${RUNTIME_OPENCLAW_DIR}"
@@ -97,7 +96,11 @@ log "Staged repo configs into ${SPARK_AGENTS_HOME}"
 section "2/7  Restarting LiteLLM"
 CURRENT_MODE="$(current_router_mode)"
 if [ "${CURRENT_MODE}" = "unknown" ]; then
-    CURRENT_MODE="${DEFAULT_MODE}"
+    if resolve_openrouter_api_key > /dev/null 2>&1; then
+        CURRENT_MODE="${DEFAULT_MODE}"
+    else
+        CURRENT_MODE="agent-mode"
+    fi
 fi
 restart_litellm "${CURRENT_MODE}"
 log "LiteLLM active mode: ${CURRENT_MODE}"
