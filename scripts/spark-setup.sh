@@ -88,14 +88,17 @@ else
     log "SuperGemma4 downloaded."
 fi
 
-# --- 4. Download Qwen3-Coder-Next Q6_K ---
-log "Downloading Qwen3-Coder-Next Q6_K GGUF (~65 GB)..."
-if [ -f "${MODEL_DIR}/qwen3-coder-next/Qwen3-Coder-Next-Q6_K.gguf" ]; then
-    warn "Qwen3-Coder-Next GGUF already exists, skipping download."
+# --- 4. Download Qwen3-Coder-Next Q6_K (sharded, 3 files under Q6_K/) ---
+# unsloth splits Q6_K into 3 shards because each exceeds HF's 50 GB LFS limit.
+# hf download --include grabs all three; Ollama/llama.cpp auto-detects the
+# remaining shards when FROM points at the first one.
+log "Downloading Qwen3-Coder-Next Q6_K GGUF shards (~65 GB total, 3 files)..."
+if [ -f "${MODEL_DIR}/qwen3-coder-next/Q6_K/Qwen3-Coder-Next-Q6_K-00001-of-00003.gguf" ]; then
+    warn "Qwen3-Coder-Next Q6_K shards already exist, skipping download."
 else
     hf download \
         unsloth/Qwen3-Coder-Next-GGUF \
-        Qwen3-Coder-Next-Q6_K.gguf \
+        --include "Q6_K/*" \
         --local-dir "${MODEL_DIR}/qwen3-coder-next"
     log "Qwen3-Coder-Next downloaded."
 fi

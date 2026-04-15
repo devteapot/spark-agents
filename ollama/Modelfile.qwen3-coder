@@ -2,9 +2,9 @@
 # Role: Coding agent (agentic coding loops, file editing, test running)
 # Source: https://huggingface.co/unsloth/Qwen3-Coder-Next-GGUF
 #
-# Download the GGUF first:
+# Download the GGUF shards first (Q6_K is split into 3 files, ~65 GB total):
 #   hf download unsloth/Qwen3-Coder-Next-GGUF \
-#     Qwen3-Coder-Next-Q6_K.gguf \
+#     --include "Q6_K/*" \
 #     --local-dir /srv/models/qwen3-coder-next
 #
 # Then build:
@@ -12,8 +12,12 @@
 #
 # /srv/models is a shared-readable location outside /home so the ollama
 # system user can read the GGUF without needing access to /home/carlid.
+#
+# FROM points at the first shard; llama.cpp/Ollama auto-detect the rest
+# via the `-NNNNN-of-NNNNN.gguf` naming convention, so all three shards
+# must sit alongside each other in the Q6_K/ directory.
 
-FROM /srv/models/qwen3-coder-next/Qwen3-Coder-Next-Q6_K.gguf
+FROM /srv/models/qwen3-coder-next/Q6_K/Qwen3-Coder-Next-Q6_K-00001-of-00003.gguf
 
 # Context window — 32768 for multi-file coding context while keeping memory in check
 PARAMETER num_ctx 32768
