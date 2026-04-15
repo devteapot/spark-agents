@@ -29,6 +29,20 @@ RUNTIME_OPENCLAW_DIR="${SPARK_AGENTS_HOME}/openclaw"
 
 DEFAULT_MODE="benchmark-mode"
 
+ensure_npm_global_bin_on_path() {
+    local prefix=""
+
+    if ! command -v npm > /dev/null 2>&1; then
+        return 0
+    fi
+
+    prefix="$(npm config get prefix 2>/dev/null || true)"
+    if [ -n "${prefix}" ] && [ -d "${prefix}/bin" ]; then
+        PATH="${prefix}/bin:${PATH}"
+        export PATH
+    fi
+}
+
 stop_process_if_running() {
     local name="$1"
     local stop_cmd="$2"
@@ -125,6 +139,7 @@ fi
 require_command curl
 require_command hermes
 require_command python3
+ensure_npm_global_bin_on_path
 ensure_runtime_dirs
 ensure_litellm_installed
 
@@ -163,6 +178,11 @@ else
     warn "OpenClaw not found. Attempting install..."
     if command -v npm > /dev/null 2>&1; then
         npm install -g openclaw@latest
+        ensure_npm_global_bin_on_path
+        if ! command -v openclaw > /dev/null 2>&1; then
+            err "OpenClaw was installed with npm but is still not on PATH. npm prefix: $(npm config get prefix 2>/dev/null || echo unknown)"
+            exit 1
+        fi
         openclaw onboard --install-daemon
     elif command -v brew > /dev/null 2>&1; then
         brew install openclaw
