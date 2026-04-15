@@ -131,7 +131,7 @@ fi
 
 log "Installing vLLM into ${VLLM_VENV}..."
 sudo "${VLLM_VENV}/bin/pip" install --upgrade pip setuptools wheel
-sudo "${VLLM_VENV}/bin/pip" install "vllm>=0.19.1" "huggingface-hub>=1.0.0" "transformers>=5.4.0"
+sudo "${VLLM_VENV}/bin/pip" install "vllm>=0.19.0,<0.20" "huggingface-hub>=1.0.0" "transformers>=5.4.0"
 
 if [ ! -x "${VLLM_BIN}" ]; then
     err "Expected vLLM binary not found at ${VLLM_BIN}"
