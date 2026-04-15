@@ -27,6 +27,8 @@ SYSTEMD_DIR="/etc/systemd/system"
 SPARK_USER="$(id -un)"
 SPARK_GROUP="$(id -gn)"
 HF_HOME="${HOME}/.cache/huggingface"
+TORCH_CUDA_INDEX_URL="https://download.pytorch.org/whl/cu130"
+VLLM_CUDA_WHEEL_URL="https://wheels.vllm.ai/2a69949bdadf0e8942b7a1619b229cb475beef20/vllm-0.19.0%2Bcu130-cp38-abi3-manylinux_2_35_aarch64.whl"
 SUPERGEMMA_MODEL_REPO="AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4"
 QWEN_MODEL_REPO="Qwen/Qwen3-Coder-Next-FP8"
 MODELOPT_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/modelopt_patched.py"
@@ -131,7 +133,15 @@ fi
 
 log "Installing vLLM into ${VLLM_VENV}..."
 sudo "${VLLM_VENV}/bin/pip" install --upgrade pip setuptools wheel
-sudo "${VLLM_VENV}/bin/pip" install "vllm>=0.19.0,<0.20" "transformers>=4.56.0,<5"
+sudo "${VLLM_VENV}/bin/pip" uninstall -y vllm torch torchaudio torchvision || true
+sudo "${VLLM_VENV}/bin/pip" install \
+    --index-url "${TORCH_CUDA_INDEX_URL}" \
+    "torch==2.10.0" \
+    "torchaudio==2.10.0" \
+    "torchvision==0.25.0"
+sudo "${VLLM_VENV}/bin/pip" install \
+    "${VLLM_CUDA_WHEEL_URL}" \
+    "transformers>=4.56.0,<5"
 
 if [ ! -x "${VLLM_BIN}" ]; then
     err "Expected vLLM binary not found at ${VLLM_BIN}"
