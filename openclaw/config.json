@@ -2,30 +2,44 @@
   "$schema": "https://docs.openclaw.ai/schema/config.json",
   "_comment": [
     "OpenClaw Configuration",
-    "Location: ~/.openclaw/config.json (on MBA: sloppy@sloppy-mba.local)",
+    "Location after deploy: ~/.openclaw/config.json (on MBA: sloppy@sloppy-mba.local)",
     "",
-    "Uses native Ollama API (not /v1) for reliable tool calling.",
-    "Primary: SuperGemma4 for general tasks.",
-    "Fallback: Qwen3-Coder-Next for coding-heavy work."
+    "OpenClaw talks only to the local LiteLLM router on the MBA.",
+    "Stable aliases: general, coder.",
+    "Hidden cloud aliases remain available as hosted fallbacks."
   ],
 
   "models": {
     "providers": {
-      "spark-ollama": {
-        "baseUrl": "http://slopinator-s-1.local:11434",
-        "apiKey": "ollama-local",
-        "api": "ollama",
+      "mba-litellm": {
+        "baseUrl": "http://127.0.0.1:4000/v1",
+        "apiKey": "litellm-local",
+        "api": "openai-completions",
         "models": [
           {
-            "id": "supergemma4:26b-q8",
-            "name": "SuperGemma4 26B Q8 (General Intelligence)",
+            "id": "general",
+            "name": "LiteLLM general route",
             "reasoning": true,
             "contextWindow": 8192,
             "maxTokens": 4096
           },
           {
-            "id": "qwen3-coder-next:q6k",
-            "name": "Qwen3-Coder-Next Q6K (Coding Agent)",
+            "id": "coder",
+            "name": "LiteLLM coder route",
+            "reasoning": true,
+            "contextWindow": 32768,
+            "maxTokens": 8192
+          },
+          {
+            "id": "general-cloud",
+            "name": "LiteLLM hosted general fallback",
+            "reasoning": true,
+            "contextWindow": 8192,
+            "maxTokens": 4096
+          },
+          {
+            "id": "coder-cloud",
+            "name": "LiteLLM hosted coder fallback",
             "reasoning": true,
             "contextWindow": 32768,
             "maxTokens": 8192
@@ -38,9 +52,11 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "spark-ollama/supergemma4:26b-q8",
+        "primary": "mba-litellm/general",
         "fallbacks": [
-          "spark-ollama/qwen3-coder-next:q6k"
+          "mba-litellm/coder",
+          "mba-litellm/general-cloud",
+          "mba-litellm/coder-cloud"
         ]
       }
     }

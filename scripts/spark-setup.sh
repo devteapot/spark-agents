@@ -1,24 +1,13 @@
 #!/usr/bin/env bash
-# spark-setup.sh — Initial setup: install prereqs, configure Ollama, download models
+# spark-setup.sh - Initial Spark setup for local vLLM serving
 #
-# Run this on the DGX Spark (carlid@slopinator-s-1.local) once.
-# It will:
-#   1. Install hf (huggingface-hub CLI) via pipx (shared install under /opt/pipx)
-#   2. Create /srv/models (shared-readable, outside /home)
-#   3. Download both model GGUFs into /srv/models
-#   4. Install a systemd override for Ollama that loads tunables from /etc/ollama.env
-#   5. Restart Ollama and build both model tags
-#
-# The systemd override pins OLLAMA_HOST to 0.0.0.0:11434 and declares
-# EnvironmentFile=-/etc/ollama.env. That env file is rewritten dynamically by
-# spark-resume.sh / spark-pause.sh, so benchmarking vs agent-serving modes are
-# cleanly separated without touching systemd state every cycle.
-#
-# You will be prompted for your sudo password (once — systemd, /etc writes, pipx).
-#
-# Prerequisites:
-#   - Ollama installed (and running as the `ollama` system user via systemd)
-#   - ~100 GB free disk space under /srv
+# Run this on the DGX Spark once. It will:
+#   1. Install hf (huggingface-hub CLI) via pipx if needed
+#   2. Create /srv/models and download the two HF model repos
+#   3. Create a dedicated vLLM virtualenv under /opt
+#   4. Apply the required NVFP4 patches for the SuperGemma vLLM path
+#   5. Install the Spark-side systemd units for SuperGemma and Qwen
+#   6. Enable the units so spark-resume.sh / spark-pause.sh can manage them
 #
 # Usage:
 #   ssh carlid@slopinator-s-1.local
@@ -26,12 +15,22 @@
 
 set -euo pipefail
 
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODEL_DIR="/srv/models"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-OVERRIDE_DIR="/etc/systemd/system/ollama.service.d"
-OVERRIDE_FILE="${OVERRIDE_DIR}/override.conf"
-ENV_FILE="/etc/ollama.env"
+SUPERGEMMA_DIR="${MODEL_DIR}/supergemma4-nvfp4"
+SUPERGEMMA_PATCH_DIR="${MODEL_DIR}/supergemma4-nvfp4-patches"
+QWEN_DIR="${MODEL_DIR}/qwen3-coder-next-fp8"
+VLLM_VENV="/opt/spark-agents-vllm"
+VLLM_BIN="${VLLM_VENV}/bin/vllm"
+VLLM_PYTHON="${VLLM_VENV}/bin/python"
+SYSTEMD_DIR="/etc/systemd/system"
+SPARK_USER="$(id -un)"
+SPARK_GROUP="$(id -gn)"
+HF_HOME="${HOME}/.cache/huggingface"
+SUPERGEMMA_MODEL_REPO="AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4"
+QWEN_MODEL_REPO="Qwen/Qwen3-Coder-Next-FP8"
+MODELOPT_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/modelopt_patched.py"
+SERVING_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/serving_chat_patched.py"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -42,130 +41,131 @@ log()  { echo -e "${GREEN}[spark-setup]${NC} $*"; }
 warn() { echo -e "${YELLOW}[spark-setup]${NC} $*"; }
 err()  { echo -e "${RED}[spark-setup]${NC} $*" >&2; }
 
-# --- 0. Preflight: need sudo ---
-log "This script needs sudo for pipx install, /srv/models, and /etc/systemd writes."
+render_template() {
+    local template="$1"
+    local destination="$2"
+    local tmp_file
+    tmp_file="$(mktemp)"
+
+    TEMPLATE_PATH="${template}" \
+    SPARK_USER_RENDER="${SPARK_USER}" \
+    SPARK_GROUP_RENDER="${SPARK_GROUP}" \
+    PROJECT_DIR_RENDER="${PROJECT_DIR}" \
+    HF_HOME_RENDER="${HF_HOME}" \
+    VLLM_BIN_RENDER="${VLLM_BIN}" \
+    SUPERGEMMA_DIR_RENDER="${SUPERGEMMA_DIR}" \
+    QWEN_DIR_RENDER="${QWEN_DIR}" \
+    python3 - <<'PY' > "${tmp_file}"
+import os
+from pathlib import Path
+
+text = Path(os.environ["TEMPLATE_PATH"]).read_text()
+replacements = {
+    "__SPARK_USER__": os.environ["SPARK_USER_RENDER"],
+    "__SPARK_GROUP__": os.environ["SPARK_GROUP_RENDER"],
+    "__PROJECT_DIR__": os.environ["PROJECT_DIR_RENDER"],
+    "__HF_HOME__": os.environ["HF_HOME_RENDER"],
+    "__VLLM_BIN__": os.environ["VLLM_BIN_RENDER"],
+    "__SUPERGEMMA_MODEL_PATH__": os.environ["SUPERGEMMA_DIR_RENDER"],
+    "__QWEN_MODEL_PATH__": os.environ["QWEN_DIR_RENDER"],
+}
+for needle, value in replacements.items():
+    text = text.replace(needle, value)
+print(text, end="")
+PY
+
+    sudo install -m 0644 "${tmp_file}" "${destination}"
+    rm -f "${tmp_file}"
+}
+
+log "This script needs sudo for /srv/models, /opt, and /etc/systemd writes."
 sudo -v
 
-# --- 1. Install hf (huggingface-hub CLI) via pipx (system-wide) ---
-# Note: the old `huggingface-cli` name was deprecated in huggingface-hub 1.10.
-# Ships as `hf` now. Same args for `hf download`.
+if ! command -v python3 > /dev/null 2>&1; then
+    err "python3 is required on the Spark."
+    exit 1
+fi
+
+log "Ensuring system prerequisites are installed..."
+sudo apt-get update -qq
+sudo apt-get install -y curl python3-venv pipx
+
 if command -v hf > /dev/null 2>&1; then
     log "hf already installed at $(command -v hf)"
 else
     log "Installing hf via pipx..."
-    if ! command -v pipx > /dev/null 2>&1; then
-        sudo apt-get update -qq
-        sudo apt-get install -y pipx
-    fi
-    # Shared install: venv in /opt/pipx, CLI symlinked into /usr/local/bin.
     sudo env PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin \
         pipx install huggingface-hub
     log "hf installed at $(command -v hf)"
 fi
 
-# --- 2. Create /srv/models (shared-readable) ---
+mkdir -p "${HF_HOME}"
+
 if [ ! -d "${MODEL_DIR}" ]; then
     log "Creating ${MODEL_DIR}..."
     sudo mkdir -p "${MODEL_DIR}"
-    sudo chown "$(id -u):$(id -g)" "${MODEL_DIR}"
+    sudo chown "${SPARK_USER}:${SPARK_GROUP}" "${MODEL_DIR}"
     sudo chmod 755 "${MODEL_DIR}"
 else
     log "${MODEL_DIR} already exists."
 fi
 
-mkdir -p "${MODEL_DIR}/supergemma4-26b"
-mkdir -p "${MODEL_DIR}/qwen3-coder-next"
+mkdir -p "${SUPERGEMMA_DIR}" "${SUPERGEMMA_PATCH_DIR}" "${QWEN_DIR}"
 
-# --- 3. Download SuperGemma4 26B Q8_0 ---
-log "Downloading SuperGemma4 26B Q8_0 GGUF (~28 GB)..."
-if [ -f "${MODEL_DIR}/supergemma4-26b/supergemma4-26b-abliterated-multimodal-Q8_0.gguf" ]; then
-    warn "SuperGemma4 GGUF already exists, skipping download."
+log "Downloading ${SUPERGEMMA_MODEL_REPO} into ${SUPERGEMMA_DIR}..."
+hf download \
+    "${SUPERGEMMA_MODEL_REPO}" \
+    --local-dir "${SUPERGEMMA_DIR}"
+
+log "Downloading ${QWEN_MODEL_REPO} into ${QWEN_DIR}..."
+hf download \
+    "${QWEN_MODEL_REPO}" \
+    --local-dir "${QWEN_DIR}"
+
+if [ ! -d "${VLLM_VENV}" ]; then
+    log "Creating vLLM virtualenv at ${VLLM_VENV}..."
+    sudo python3 -m venv "${VLLM_VENV}"
 else
-    hf download \
-        Jiunsong/supergemma4-26b-abliterated-multimodal-gguf-8bit \
-        supergemma4-26b-abliterated-multimodal-Q8_0.gguf \
-        --local-dir "${MODEL_DIR}/supergemma4-26b"
-    log "SuperGemma4 downloaded."
+    log "${VLLM_VENV} already exists."
 fi
 
-# --- 4. Download Qwen3-Coder-Next Q6_K (sharded, 3 files under Q6_K/) ---
-# unsloth splits Q6_K into 3 shards because each exceeds HF's 50 GB LFS limit.
-# hf download --include grabs all three; Ollama/llama.cpp auto-detects the
-# remaining shards when FROM points at the first one.
-log "Downloading Qwen3-Coder-Next Q6_K GGUF shards (~65 GB total, 3 files)..."
-if [ -f "${MODEL_DIR}/qwen3-coder-next/Q6_K/Qwen3-Coder-Next-Q6_K-00001-of-00003.gguf" ]; then
-    warn "Qwen3-Coder-Next Q6_K shards already exist, skipping download."
-else
-    hf download \
-        unsloth/Qwen3-Coder-Next-GGUF \
-        --include "Q6_K/*" \
-        --local-dir "${MODEL_DIR}/qwen3-coder-next"
-    log "Qwen3-Coder-Next downloaded."
+log "Installing vLLM into ${VLLM_VENV}..."
+sudo "${VLLM_VENV}/bin/pip" install --upgrade pip setuptools wheel
+sudo "${VLLM_VENV}/bin/pip" install "vllm>=0.19.1" "huggingface-hub>=1.0.0" "transformers>=5.4.0"
+
+if [ ! -x "${VLLM_BIN}" ]; then
+    err "Expected vLLM binary not found at ${VLLM_BIN}"
+    exit 1
 fi
 
-# --- 5. Install Ollama systemd override (idempotent) ---
-log "Installing Ollama systemd override at ${OVERRIDE_FILE}..."
-sudo mkdir -p "${OVERRIDE_DIR}"
-sudo tee "${OVERRIDE_FILE}" > /dev/null << 'OVERRIDE_EOF'
-# Managed by spark-agents/scripts/spark-setup.sh. Do not hand-edit.
-#
-# OLLAMA_HOST is pinned here as the baseline (network binding never changes).
-# Runtime tunables (NUM_PARALLEL, KV_CACHE_TYPE, FLASH_ATTENTION, ...) live in
-# /etc/ollama.env, which is rewritten by spark-resume.sh and spark-pause.sh.
-# The leading `-` on EnvironmentFile makes the file optional: if it's absent
-# or empty, Ollama starts with stock defaults plus OLLAMA_HOST.
-[Service]
-Environment="OLLAMA_HOST=0.0.0.0:11434"
-EnvironmentFile=-/etc/ollama.env
-OVERRIDE_EOF
+log "Downloading SuperGemma NVFP4 vLLM patches..."
+curl -fsSL "${MODELOPT_PATCH_URL}" -o "${SUPERGEMMA_PATCH_DIR}/modelopt_patched.py"
+curl -fsSL "${SERVING_PATCH_URL}" -o "${SUPERGEMMA_PATCH_DIR}/serving_chat_patched.py"
 
-# --- 6. Baseline /etc/ollama.env (empty — stock defaults) ---
-if [ ! -f "${ENV_FILE}" ]; then
-    log "Creating empty ${ENV_FILE} (benchmark / stock-default mode)..."
-    sudo tee "${ENV_FILE}" > /dev/null << 'ENVEOF'
-# Ollama runtime tunables. Managed by spark-resume.sh / spark-pause.sh.
-# Empty = stock Ollama defaults (used when benchmarking).
-ENVEOF
-else
-    log "${ENV_FILE} already exists, leaving untouched."
-fi
+VLLM_DIR="$("${VLLM_PYTHON}" -c "import vllm; print(vllm.__path__[0])")"
+MODELOPT_TARGET="${VLLM_DIR}/model_executor/layers/quantization/modelopt.py"
+SERVING_TARGET="${VLLM_DIR}/entrypoints/openai/chat_completion/serving.py"
 
-# --- 7. Reload systemd and restart Ollama ---
-log "Reloading systemd and restarting Ollama..."
+log "Applying SuperGemma NVFP4 patches into ${VLLM_DIR}..."
+sudo install -m 0644 "${SUPERGEMMA_PATCH_DIR}/modelopt_patched.py" "${MODELOPT_TARGET}"
+sudo install -m 0644 "${SUPERGEMMA_PATCH_DIR}/serving_chat_patched.py" "${SERVING_TARGET}"
+
+log "Installing Spark systemd units..."
+render_template "${PROJECT_DIR}/systemd/vllm-supergemma.service.tpl" "${SYSTEMD_DIR}/vllm-supergemma.service"
+render_template "${PROJECT_DIR}/systemd/vllm-qwen.service.tpl" "${SYSTEMD_DIR}/vllm-qwen.service"
+
+log "Reloading systemd and enabling vLLM services..."
 sudo systemctl daemon-reload
-sudo systemctl restart ollama
-
-# Wait for Ollama to come back online
-for i in $(seq 1 20); do
-    if curl -sf http://localhost:11434/api/version > /dev/null 2>&1; then
-        VERSION=$(curl -sf http://localhost:11434/api/version | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','?'))" 2>/dev/null || echo "?")
-        log "Ollama is online (v${VERSION})."
-        break
-    fi
-    [ $i -eq 20 ] && { err "Ollama did not come back online within 20s."; err "Check:  journalctl -u ollama -n 50"; exit 1; }
-    sleep 1
-done
-
-# --- 8. Build Ollama models from Modelfiles ---
-log "Building Ollama model: supergemma4:26b-q8..."
-ollama create supergemma4:26b-q8 -f "${SCRIPT_DIR}/ollama/Modelfile.supergemma4"
-log "supergemma4:26b-q8 created."
-
-log "Building Ollama model: qwen3-coder-next:q6k..."
-ollama create qwen3-coder-next:q6k -f "${SCRIPT_DIR}/ollama/Modelfile.qwen3-coder"
-log "qwen3-coder-next:q6k created."
-
-# --- 9. Verify ---
-echo ""
-log "Setup complete. Registered models:"
-ollama list | grep -E "(supergemma4|qwen3-coder)" || true
+sudo systemctl enable vllm-supergemma.service vllm-qwen.service
 
 echo ""
-log "Ollama config:"
-log "  Override:  ${OVERRIDE_FILE}   (static, pins OLLAMA_HOST)"
-log "  Env file:  ${ENV_FILE}        (dynamic, rewritten by resume/pause)"
+log "Setup complete."
+log "  SuperGemma NVFP4 path: ${SUPERGEMMA_DIR}"
+log "  SuperGemma patches:    ${SUPERGEMMA_PATCH_DIR}"
+log "  Qwen FP8 path:        ${QWEN_DIR}"
+log "  vLLM virtualenv:      ${VLLM_VENV}"
 log ""
 log "Next steps:"
-log "  1. Test a model:   ollama run supergemma4:26b-q8 'hello'"
-log "  2. On MBA, run:    spark-resume.sh   (to start agents, applies tunings)"
-log "  3. To benchmark:   spark-pause.sh    (clears tunings, restarts Ollama)"
+log "  1. On MBA, run:    ./scripts/mba-deploy.sh"
+log "  2. On MBA, run:    spark-resume.sh   (starts both Spark vLLM services)"
+log "  3. Anytime:        spark-status.sh"

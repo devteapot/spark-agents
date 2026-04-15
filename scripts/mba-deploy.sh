@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
-# mba-deploy.sh — Deploy Hermes + OpenClaw on the MBA
+# mba-deploy.sh - Deploy the always-on MBA side of the stack
 #
-# Run this ON the MBA (sloppy@sloppy-mba.local) from inside the spark-agents directory.
-#
-# What it does:
-#   1. Stops any running Hermes agent
-#   2. Backs up existing Hermes config
-#   3. Deploys new Hermes config pointing to Spark Ollama
-#   4. Installs OpenClaw if not present
-#   5. Deploys OpenClaw config pointing to Spark Ollama
-#   6. Installs management scripts to ~/bin
-#   7. Verifies Spark Ollama connectivity
+# Run this on the MBA from inside the repo checkout. It will:
+#   1. Stage Hermes, OpenClaw, and LiteLLM configs into ~/.spark-agents
+#   2. Copy the live agent configs into ~/.hermes and ~/.openclaw
+#   3. Ensure LiteLLM is installed and restart it in the active mode
+#   4. Restart Hermes and OpenClaw once so they pick up the new router-backed configs
+#   5. Install the operational scripts into ~/bin
 #
 # Usage:
 #   cd spark-agents
@@ -18,163 +14,160 @@
 
 set -euo pipefail
 
+SCRIPT_LABEL="deploy"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${SCRIPT_DIR}/spark-common.sh"
 
-SPARK_HOST="slopinator-s-1.local"
-SPARK_OLLAMA="http://${SPARK_HOST}:11434"
+HERMES_REPO_CONFIG="${PROJECT_DIR}/hermes/cli-config.yaml"
+OPENCLAW_REPO_CONFIG="${PROJECT_DIR}/openclaw/config.json"
+LITELLM_AGENT_REPO_CONFIG="${PROJECT_DIR}/litellm/agent-mode.yaml"
+LITELLM_BENCHMARK_REPO_CONFIG="${PROJECT_DIR}/litellm/benchmark-mode.yaml"
 
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+RUNTIME_HERMES_DIR="${SPARK_AGENTS_HOME}/hermes"
+RUNTIME_OPENCLAW_DIR="${SPARK_AGENTS_HOME}/openclaw"
 
-log()     { echo -e "${GREEN}[deploy]${NC} $*"; }
-warn()    { echo -e "${YELLOW}[deploy]${NC} $*"; }
-err()     { echo -e "${RED}[deploy]${NC} $*" >&2; }
-section() { echo -e "\n${CYAN}━━━ $* ━━━${NC}"; }
+DEFAULT_MODE="benchmark-mode"
 
-# --- Preflight: check we're in the right place ---
-if [ ! -f "${PROJECT_DIR}/hermes/cli-config.yaml" ] || [ ! -f "${PROJECT_DIR}/openclaw/config.json" ]; then
-    err "Cannot find config files. Run this from inside the spark-agents directory:"
-    err "  cd spark-agents && ./scripts/mba-deploy.sh"
+stop_process_if_running() {
+    local name="$1"
+    local stop_cmd="$2"
+
+    if ! pgrep -f "${name}" > /dev/null 2>&1; then
+        log "${name} was not running."
+        return 0
+    fi
+
+    log "Stopping ${name}..."
+    eval "${stop_cmd}" || true
+    sleep 1
+
+    if pgrep -f "${name}" > /dev/null 2>&1; then
+        pkill -TERM -f "${name}" 2>/dev/null || true
+        sleep 1
+    fi
+
+    if pgrep -f "${name}" > /dev/null 2>&1; then
+        pkill -9 -f "${name}" 2>/dev/null || true
+    fi
+}
+
+start_process_if_needed() {
+    local name="$1"
+    local start_cmd="$2"
+    local log_file="$3"
+
+    if pgrep -f "${name}" > /dev/null 2>&1; then
+        warn "${name} is already running."
+        return 0
+    fi
+
+    log "Starting ${name}..."
+    nohup sh -c "${start_cmd}" > "${log_file}" 2>&1 &
+    sleep 2
+
+    if pgrep -f "${name}" > /dev/null 2>&1; then
+        log "${name} started. Log: ${log_file}"
+    else
+        err "${name} failed to start. Check ${log_file}"
+        return 1
+    fi
+}
+
+if [ ! -f "${HERMES_REPO_CONFIG}" ] || [ ! -f "${OPENCLAW_REPO_CONFIG}" ] || [ ! -f "${LITELLM_AGENT_REPO_CONFIG}" ] || [ ! -f "${LITELLM_BENCHMARK_REPO_CONFIG}" ]; then
+    err "Repo config files are missing. Run this from inside the spark-agents checkout."
     exit 1
 fi
 
-section "1/7  Stopping existing Hermes Agent"
-if pgrep -f "hermes" > /dev/null 2>&1; then
-    hermes stop 2>/dev/null || true
-    sleep 1
-    pkill -f "hermes" 2>/dev/null || true
-    sleep 1
-    if pgrep -f "hermes" > /dev/null 2>&1; then
-        pkill -9 -f "hermes" 2>/dev/null || true
-    fi
-    log "Hermes stopped."
-else
-    log "Hermes was not running."
-fi
+require_command curl
+require_command hermes
+require_command python3
+ensure_runtime_dirs
+ensure_litellm_installed
+require_openrouter_api_key > /dev/null
 
-section "2/7  Backing up existing Hermes config"
-if [ -d "${HOME}/.hermes" ]; then
-    BACKUP="${HOME}/.hermes.bak.$(date +%Y%m%d_%H%M%S)"
-    cp -r "${HOME}/.hermes" "${BACKUP}"
-    log "Backed up to ${BACKUP}"
-else
-    log "No existing ~/.hermes found, nothing to back up."
+section "1/7  Staging runtime configs"
+mkdir -p "${RUNTIME_HERMES_DIR}" "${RUNTIME_OPENCLAW_DIR}"
+cp "${HERMES_REPO_CONFIG}" "${RUNTIME_HERMES_DIR}/cli-config.yaml"
+cp "${OPENCLAW_REPO_CONFIG}" "${RUNTIME_OPENCLAW_DIR}/config.json"
+cp "${LITELLM_AGENT_REPO_CONFIG}" "${LITELLM_AGENT_CONFIG}"
+cp "${LITELLM_BENCHMARK_REPO_CONFIG}" "${LITELLM_BENCHMARK_CONFIG}"
+log "Staged repo configs into ${SPARK_AGENTS_HOME}"
+
+section "2/7  Restarting LiteLLM"
+CURRENT_MODE="$(current_router_mode)"
+if [ "${CURRENT_MODE}" = "unknown" ]; then
+    CURRENT_MODE="${DEFAULT_MODE}"
 fi
+restart_litellm "${CURRENT_MODE}"
+log "LiteLLM active mode: ${CURRENT_MODE}"
 
 section "3/7  Deploying Hermes config"
 mkdir -p "${HOME}/.hermes"
-cp "${PROJECT_DIR}/hermes/cli-config.yaml" "${HOME}/.hermes/cli-config.yaml"
+if [ -f "${HOME}/.hermes/cli-config.yaml" ]; then
+    cp "${HOME}/.hermes/cli-config.yaml" "${HOME}/.hermes/cli-config.yaml.bak.$(date +%Y%m%d_%H%M%S)"
+fi
+cp "${RUNTIME_HERMES_DIR}/cli-config.yaml" "${HOME}/.hermes/cli-config.yaml"
 log "Installed ~/.hermes/cli-config.yaml"
-echo "  Provider:  Ollama @ ${SPARK_OLLAMA}"
-echo "  Primary:   supergemma4:26b-q8"
-echo "  Coding:    qwen3-coder-next:q6k"
 
 section "4/7  Checking OpenClaw installation"
 if command -v openclaw > /dev/null 2>&1; then
-    CLAW_VERSION=$(openclaw --version 2>/dev/null || echo "unknown")
-    log "OpenClaw already installed (${CLAW_VERSION})"
+    log "OpenClaw already installed ($(openclaw --version 2>/dev/null || echo unknown))"
 else
     warn "OpenClaw not found. Attempting install..."
     if command -v npm > /dev/null 2>&1; then
         npm install -g openclaw@latest
         openclaw onboard --install-daemon
-        log "OpenClaw installed via npm."
     elif command -v brew > /dev/null 2>&1; then
         brew install openclaw
-        log "OpenClaw installed via Homebrew."
     else
-        err "Cannot install OpenClaw: neither npm nor brew found."
-        err "Install manually: npm install -g openclaw@latest"
-        err "Continuing with remaining setup..."
+        err "Cannot install OpenClaw automatically. Install it manually and rerun mba-deploy.sh."
+        exit 1
     fi
 fi
 
 section "5/7  Deploying OpenClaw config"
 mkdir -p "${HOME}/.openclaw"
-
-# Stop OpenClaw if running
-if pgrep -f "openclaw" > /dev/null 2>&1; then
-    openclaw stop 2>/dev/null || pkill -f "openclaw" 2>/dev/null || true
-    log "Stopped running OpenClaw."
-fi
-
-# Back up existing config
 if [ -f "${HOME}/.openclaw/config.json" ]; then
     cp "${HOME}/.openclaw/config.json" "${HOME}/.openclaw/config.json.bak.$(date +%Y%m%d_%H%M%S)"
-    log "Backed up existing OpenClaw config."
 fi
-
-cp "${PROJECT_DIR}/openclaw/config.json" "${HOME}/.openclaw/config.json"
+cp "${RUNTIME_OPENCLAW_DIR}/config.json" "${HOME}/.openclaw/config.json"
 log "Installed ~/.openclaw/config.json"
 
-section "6/7  Installing management scripts"
-mkdir -p "${HOME}/bin"
+section "6/7  Restarting agents on the new router-backed configs"
+stop_process_if_running "hermes" "hermes stop 2>/dev/null"
+stop_process_if_running "openclaw" "openclaw stop 2>/dev/null"
 
-for script in spark-pause.sh spark-resume.sh spark-status.sh; do
+start_process_if_needed "hermes" "hermes start" "/tmp/hermes-agent.log"
+start_process_if_needed "openclaw" "openclaw start" "/tmp/openclaw.log"
+
+section "7/7  Installing operational scripts"
+mkdir -p "${HOME}/bin"
+for script in spark-common.sh spark-pause.sh spark-resume.sh spark-status.sh; do
     cp "${PROJECT_DIR}/scripts/${script}" "${HOME}/bin/${script}"
     chmod +x "${HOME}/bin/${script}"
 done
-log "Installed to ~/bin: spark-pause.sh, spark-resume.sh, spark-status.sh"
+log "Installed scripts into ~/bin"
 
-# Ensure ~/bin is in PATH
 if [[ ":$PATH:" != *":${HOME}/bin:"* ]]; then
     SHELL_RC="${HOME}/.zshrc"
     [ -f "${SHELL_RC}" ] || SHELL_RC="${HOME}/.bashrc"
     if ! grep -q 'export PATH="$HOME/bin:$PATH"' "${SHELL_RC}" 2>/dev/null; then
         echo 'export PATH="$HOME/bin:$PATH"' >> "${SHELL_RC}"
-        log "Added ~/bin to PATH in ${SHELL_RC}"
-        warn "Run 'source ${SHELL_RC}' or open a new terminal for PATH to take effect."
+        warn "Added ~/bin to PATH in ${SHELL_RC}. Open a new shell or source it before using spark-*.sh."
     fi
 fi
 
-section "7/7  Verifying Spark Ollama connectivity"
-echo -n "  Reaching ${SPARK_OLLAMA}... "
-if curl -sf --connect-timeout 5 "${SPARK_OLLAMA}/api/version" > /dev/null 2>&1; then
-    VERSION=$(curl -sf "${SPARK_OLLAMA}/api/version" | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','?'))" 2>/dev/null || echo "?")
-    echo -e "${GREEN}OK${NC} (Ollama v${VERSION})"
-
-    echo ""
-    log "Checking loaded models..."
-    curl -sf "${SPARK_OLLAMA}/api/tags" 2>/dev/null | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-models = data.get('models', [])
-if not models:
-    print('  No models registered yet. Run spark-setup.sh on the Spark first.')
-else:
-    for m in models:
-        name = m.get('name', '?')
-        size = m.get('size', 0)
-        size_gb = size / (1024**3)
-        print(f'  {name:40s} {size_gb:.1f} GB')
-" 2>/dev/null || echo "  Could not parse model list."
-else
-    echo -e "${YELLOW}UNREACHABLE${NC}"
-    warn "Cannot reach Spark Ollama at ${SPARK_OLLAMA}"
-    warn "This is expected if the Spark isn't running Ollama right now."
-    warn "When ready, run spark-setup.sh on the Spark, then spark-resume.sh here."
-fi
-
-# --- Summary ---
 echo ""
-echo -e "${CYAN}━━━ Deployment Complete ━━━${NC}"
-echo ""
-echo "  Files deployed:"
-echo "    ~/.hermes/cli-config.yaml     Hermes → Spark Ollama"
-echo "    ~/.openclaw/config.json       OpenClaw → Spark Ollama"
-echo "    ~/bin/spark-pause.sh          Stop agents, unload models"
-echo "    ~/bin/spark-resume.sh         Load models, start agents"
-echo "    ~/bin/spark-status.sh         Health check"
+section "Deployment Complete"
+echo "  LiteLLM endpoint:  ${LITELLM_V1_URL}"
+echo "  Router mode:       ${CURRENT_MODE}"
+echo "  Hermes config:     ${HOME}/.hermes/cli-config.yaml"
+echo "  OpenClaw config:   ${HOME}/.openclaw/config.json"
+echo "  LiteLLM configs:   ${LITELLM_RUNTIME_DIR}"
 echo ""
 echo "  Next steps:"
-echo "    1. On Spark: run spark-setup.sh to download models + configure Ollama"
-echo "    2. On MBA:   run spark-resume.sh to preload models + start agents"
-echo "    3. Anytime:  run spark-status.sh to check everything"
-echo ""
-echo "  To pause for benchmarking:  spark-pause.sh"
-echo "  To resume agents:           spark-resume.sh"
-echo ""
+echo "    1. On Spark: run ./scripts/spark-setup.sh once"
+echo "    2. For local serving: spark-resume.sh"
+echo "    3. For benchmarking:  spark-pause.sh"
+echo "    4. Check health:      spark-status.sh"

@@ -1,0 +1,22 @@
+model_list:
+  - model_name: general
+    litellm_params:
+      model: openai/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4
+      api_base: http://slopinator-s-1.local:8001/v1
+      api_key: litellm-local
+
+  - model_name: coder
+    litellm_params:
+      model: openai/Qwen/Qwen3-Coder-Next-FP8
+      api_base: http://slopinator-s-1.local:8002/v1
+      api_key: litellm-local
+
+  - model_name: general-cloud
+    litellm_params:
+      model: openrouter/google/gemini-2.5-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: coder-cloud
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-4-5
+      api_key: os.environ/OPENROUTER_API_KEY

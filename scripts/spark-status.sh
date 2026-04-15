@@ -1,87 +1,55 @@
 #!/usr/bin/env bash
-# spark-status.sh — Quick health check: Ollama status, loaded models, agent processes
-#
-# Run on MBA to check the full stack at a glance.
-#
-# Usage: ./spark-status.sh
+# spark-status.sh - Health check for LiteLLM, Spark vLLM services, and agent processes
 
 set -uo pipefail
 
-SPARK_HOST="slopinator-s-1.local"
-SPARK_OLLAMA="http://${SPARK_HOST}:11434"
+SCRIPT_LABEL="spark-status"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/spark-common.sh"
 
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+require_command curl
 
-section() { echo -e "\n${CYAN}── $* ──${NC}"; }
-
-# --- Ollama ---
-section "Spark Ollama (${SPARK_HOST})"
-if curl -sf "${SPARK_OLLAMA}/api/version" > /dev/null 2>&1; then
-    VERSION=$(curl -sf "${SPARK_OLLAMA}/api/version" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','?'))" 2>/dev/null || echo "?")
-    echo -e "  Status:  ${GREEN}ONLINE${NC} (v${VERSION})"
+section "Router"
+echo "  Active mode:  $(current_router_mode)"
+if litellm_is_running; then
+    echo -e "  LiteLLM:      ${GREEN}RUNNING${NC} (PID $(litellm_pid))"
 else
-    echo -e "  Status:  ${RED}OFFLINE${NC}"
-    echo "  Cannot reach ${SPARK_OLLAMA}"
+    echo -e "  LiteLLM:      ${YELLOW}STOPPED${NC}"
 fi
 
-# --- Loaded Models ---
-section "Loaded Models"
-MODELS_JSON=$(curl -sf "${SPARK_OLLAMA}/api/ps" 2>/dev/null || echo '{}')
-if echo "${MODELS_JSON}" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-models = data.get('models', [])
-if not models:
-    print('  No models loaded.')
-else:
-    for m in models:
-        name = m.get('name', '?')
-        size = m.get('size', 0)
-        size_gb = size / (1024**3)
-        print(f'  {name:40s} {size_gb:.1f} GB')
-" 2>/dev/null; then
-    :
+if MODELS_JSON="$(curl -sf "${LITELLM_V1_URL}/models" 2>/dev/null)"; then
+    echo -e "  Endpoint:     ${GREEN}ONLINE${NC} (${LITELLM_V1_URL})"
+    print_openai_models "${MODELS_JSON}"
 else
-    echo "  Could not parse model list."
+    echo -e "  Endpoint:     ${RED}OFFLINE${NC} (${LITELLM_V1_URL})"
 fi
 
-# --- Available Models ---
-section "Available Models (on Spark)"
-TAGS_JSON=$(curl -sf "${SPARK_OLLAMA}/api/tags" 2>/dev/null || echo '{}')
-echo "${TAGS_JSON}" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-models = data.get('models', [])
-if not models:
-    print('  No models registered.')
-else:
-    for m in models:
-        name = m.get('name', '?')
-        size = m.get('size', 0)
-        size_gb = size / (1024**3)
-        print(f'  {name:40s} {size_gb:.1f} GB')
-" 2>/dev/null || echo "  Could not parse."
+section "Spark vLLM"
+if MODELS_JSON="$(curl -sf "${SPARK_SUPERGEMMA_V1_URL}/models" 2>/dev/null)"; then
+    echo -e "  SuperGemma:   ${GREEN}ONLINE${NC} (${SPARK_SUPERGEMMA_V1_URL})"
+    print_openai_models "${MODELS_JSON}"
+else
+    echo -e "  SuperGemma:   ${YELLOW}OFFLINE${NC} (${SPARK_SUPERGEMMA_V1_URL})"
+fi
 
-# --- Hermes Agent ---
-section "Hermes Agent (local)"
+if MODELS_JSON="$(curl -sf "${SPARK_QWEN_V1_URL}/models" 2>/dev/null)"; then
+    echo -e "  Qwen:         ${GREEN}ONLINE${NC} (${SPARK_QWEN_V1_URL})"
+    print_openai_models "${MODELS_JSON}"
+else
+    echo -e "  Qwen:         ${YELLOW}OFFLINE${NC} (${SPARK_QWEN_V1_URL})"
+fi
+
+section "Agents"
 if pgrep -f "hermes" > /dev/null 2>&1; then
-    PID=$(pgrep -f "hermes" | head -1)
-    echo -e "  Status:  ${GREEN}RUNNING${NC} (PID ${PID})"
+    echo -e "  Hermes:       ${GREEN}RUNNING${NC} (PID $(pgrep -f "hermes" | head -1))"
 else
-    echo -e "  Status:  ${YELLOW}STOPPED${NC}"
+    echo -e "  Hermes:       ${YELLOW}STOPPED${NC}"
 fi
 
-# --- OpenClaw ---
-section "OpenClaw (local)"
 if pgrep -f "openclaw" > /dev/null 2>&1; then
-    PID=$(pgrep -f "openclaw" | head -1)
-    echo -e "  Status:  ${GREEN}RUNNING${NC} (PID ${PID})"
+    echo -e "  OpenClaw:     ${GREEN}RUNNING${NC} (PID $(pgrep -f "openclaw" | head -1))"
 else
-    echo -e "  Status:  ${YELLOW}STOPPED${NC}"
+    echo -e "  OpenClaw:     ${YELLOW}STOPPED${NC}"
 fi
 
 echo ""

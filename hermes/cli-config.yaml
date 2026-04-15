@@ -1,75 +1,75 @@
 # Hermes Agent Configuration
-# Location: ~/.hermes/cli-config.yaml (on MBA: sloppy@sloppy-mba.local)
+# Location after deploy: ~/.hermes/cli-config.yaml (on MBA: sloppy@sloppy-mba.local)
 #
-# This configures Hermes to use the DGX Spark as its inference backend
-# with SuperGemma4 as the primary model and Qwen3-Coder-Next for coding tasks.
+# Hermes talks only to the local LiteLLM router. The router owns mode switching:
+#   - agent-mode     -> Spark vLLM for `general` / `coder`
+#   - benchmark-mode -> hosted OpenRouter models
+# Hidden cloud aliases stay available so Hermes can fail over without changing
+# its stable public model names.
 
-# --- Provider: DGX Spark Ollama ---
 provider: custom
-model: supergemma4:26b-q8
-base_url: "http://slopinator-s-1.local:11434/v1"
-api_key: "ollama-local"
+model: coder
+base_url: "http://127.0.0.1:4000/v1"
+api_key: "litellm-local"
 
-# --- Model Aliases ---
-# Shortcuts for switching models via /model command
 model_aliases:
   general:
-    model: "supergemma4:26b-q8"
+    model: "general"
     provider: custom
-    base_url: "http://slopinator-s-1.local:11434/v1"
+    base_url: "http://127.0.0.1:4000/v1"
     context_length: 8192
     max_tokens: 4096
 
   coder:
-    model: "qwen3-coder-next:q6k"
+    model: "coder"
     provider: custom
-    base_url: "http://slopinator-s-1.local:11434/v1"
+    base_url: "http://127.0.0.1:4000/v1"
     context_length: 32768
     max_tokens: 8192
 
-# --- Smart Model Routing ---
-# Route simple/short turns to the faster general model,
-# keep the coding model for code-heavy tasks
+  general-cloud:
+    model: "general-cloud"
+    provider: custom
+    base_url: "http://127.0.0.1:4000/v1"
+    context_length: 8192
+    max_tokens: 4096
+
+  coder-cloud:
+    model: "coder-cloud"
+    provider: custom
+    base_url: "http://127.0.0.1:4000/v1"
+    context_length: 32768
+    max_tokens: 8192
+
 smart_model_routing:
   enabled: true
   max_simple_chars: 200
   max_simple_words: 35
   cheap_model:
     provider: custom
-    model: "supergemma4:26b-q8"
-    base_url: "http://slopinator-s-1.local:11434/v1"
-    api_key: "ollama-local"
+    model: "general"
+    base_url: "http://127.0.0.1:4000/v1"
+    api_key: "litellm-local"
 
-# --- Agent Behavior ---
-# Run as a background autonomous agent
+fallback_model:
+  provider: custom
+  model: "general-cloud"
+  base_url: "http://127.0.0.1:4000/v1"
+  api_key: "litellm-local"
+
 autonomous: true
 
-# Skill creation — let Hermes learn from complex tasks
 skills:
   auto_create: true
   min_tool_calls: 5
 
-# Memory — persist across sessions
 memory:
   enabled: true
   provider: local
 
-# --- Tool Configuration ---
 tools:
   enabled: true
-  # Add your tool configurations here, e.g.:
-  # web_search:
-  #   enabled: true
-  # file_system:
-  #   enabled: true
-  #   allowed_paths:
-  #     - /home/sloppy/projects
-  # shell:
-  #   enabled: true
-  #   allowed_commands: ["git", "npm", "python3", "cargo"]
 
-# --- Gateway / Messaging ---
-# Uncomment and configure the platforms you want Hermes to connect to
 # gateway:
 #   telegram:
 #     token: "YOUR_TELEGRAM_BOT_TOKEN"

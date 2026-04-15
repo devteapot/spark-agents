@@ -1,0 +1,20 @@
+model_list:
+  - model_name: general
+    litellm_params:
+      model: openrouter/google/gemini-2.5-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: coder
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-4-5
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: general-cloud
+    litellm_params:
+      model: openrouter/google/gemini-2.5-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: coder-cloud
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-4-5
+      api_key: os.environ/OPENROUTER_API_KEY

@@ -4,12 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository purpose
 
-This is **not** an application. It is a configuration + deployment repo for a two-machine local-LLM setup:
+This is **not** an application. It is a configuration + deployment repo for a two-machine agent setup:
 
-- **DGX Spark** (`carlid@slopinator-s-1.local`) — runs Ollama, hosts the models.
-- **MacBook Air** (`sloppy@sloppy-mba.local`) — runs two agents (Hermes, OpenClaw) that hit the Spark's Ollama over the LAN.
+- **DGX Spark** (`carlid@slopinator-s-1.local`) - runs two `vLLM` services:
+  - `vllm-supergemma.service` on `:8001`
+  - `vllm-qwen.service` on `:8002`
+- **MacBook Air** (`sloppy@sloppy-mba.local`) - runs Hermes, OpenClaw, and a local `LiteLLM` router on `127.0.0.1:4000`
 
-The repo is cloned to both machines and scripts are run on whichever side they target. Editing a config means: commit, push, pull on the other box, then re-run `mba-deploy.sh` if MBA configs changed (they get copied into `~/.hermes/` and `~/.openclaw/`).
+The repo is cloned to both machines and scripts are run on whichever side they target. Editing configs or scripts means: commit, push, pull on the other box, then rerun `mba-deploy.sh` on the MBA so the staged runtime configs in `~/.spark-agents/` are refreshed and the live configs in `~/.hermes/` + `~/.openclaw/` are replaced.
 
 ## Common commands
 
@@ -17,50 +19,66 @@ All scripts live in `scripts/` and are idempotent.
 
 | Command | Where to run | What it does |
 |---|---|---|
-| `./scripts/spark-setup.sh` | Spark, once | Installs `hf` (huggingface-hub CLI) via pipx (shared, `/opt/pipx` → `/usr/local/bin`), creates `/srv/models`, downloads both GGUFs, writes the systemd override + baseline `/etc/ollama.env`, `daemon-reload`, restart, `ollama create` both tags. Prompts for sudo password once. |
-| `./scripts/mba-deploy.sh` | MBA, after each config change | Stops Hermes, copies `hermes/cli-config.yaml` → `~/.hermes/`, `openclaw/config.json` → `~/.openclaw/`, installs `spark-*.sh` into `~/bin`, pings Spark Ollama. |
-| `spark-resume.sh` | MBA, daily | `ssh -tt` to Spark → sudo-writes agent `/etc/ollama.env` (`NUM_PARALLEL=2`, `MAX_LOADED_MODELS=2`, `KV_CACHE_TYPE=q8_0`, `FLASH_ATTENTION=1`) → `systemctl restart ollama` → preloads both models with `keep_alive: -1` → starts `hermes` and `openclaw` locally. Prompts for Spark sudo password once. |
-| `spark-pause.sh` | MBA, before benchmarking | Stops local agents, unloads both models (`keep_alive: 0`), `ssh -tt` to Spark → sudo-clears `/etc/ollama.env` → `systemctl restart ollama`. |
-| `spark-status.sh` | MBA, anytime | Hits `/api/version`, `/api/ps`, `/api/tags` on Spark; checks for `hermes` and `openclaw` processes locally. Read-only. |
+| `./scripts/spark-setup.sh` | Spark, once | Installs `hf` via pipx, downloads the NVFP4/FP8 model repos into `/srv/models`, installs a dedicated vLLM virtualenv under `/opt/spark-agents-vllm`, applies the required SuperGemma NVFP4 vLLM patches, writes the Spark systemd units, `daemon-reload`, and enables them. |
+| `./scripts/mba-deploy.sh` | MBA, after config/script edits | Stages `hermes/`, `openclaw/`, and `litellm/` configs into `~/.spark-agents`, restarts LiteLLM in the active mode, copies the live configs into `~/.hermes/` + `~/.openclaw/`, restarts Hermes/OpenClaw once, and installs `spark-*.sh` into `~/bin`. |
+| `spark-resume.sh` | MBA, daily | Starts both Spark `vLLM` services over SSH using a single remote `sudo bash -se` path, waits for `/v1/models`, runs a basic chat + tool-call health check, then switches LiteLLM into `agent-mode`. Hermes/OpenClaw stay running. |
+| `spark-pause.sh` | MBA, before benchmarking | Switches LiteLLM into `benchmark-mode` first, then stops both Spark `vLLM` services over SSH. Hermes/OpenClaw stay running. |
+| `spark-status.sh` | MBA, anytime | Reports LiteLLM health/mode, Spark `vLLM` health, and Hermes/OpenClaw process state. Read-only. |
 
-There are no tests, no build, no linter — it's shell + YAML + JSON + Modelfiles.
+There are no tests, no build, and no linter - it's shell + YAML + JSON + service templates.
 
 ## Architecture
 
 ### The pause/resume pattern (the critical invariant)
 
-The Spark is dual-use: **agent serving** and **direct benchmarking**. These need different Ollama env vars, and the benchmark workflow must never silently inherit agent tuning.
+The Spark is dual-use: **agent serving** and **direct benchmarking**. The benchmark workflow must never inherit agent inference traffic.
 
-Ollama on the Spark runs as a systemd service under its own `ollama` system user. The env is split across two files, installed once by `spark-setup.sh`:
+The enforcement point is the MBA-side `LiteLLM` router:
 
-1. **`/etc/systemd/system/ollama.service.d/override.conf`** — static baseline. Pins `OLLAMA_HOST=0.0.0.0:11434` and declares `EnvironmentFile=-/etc/ollama.env`. Never rewritten after setup. The leading `-` on `EnvironmentFile` makes the env file optional so empty/missing is fine.
-2. **`/etc/ollama.env`** — dynamic tunables. Rewritten each pause/resume cycle. Never contains `OLLAMA_HOST` — the override owns that.
+- **Agent mode** (`spark-resume.sh`):
+  - start Spark `vLLM` services
+  - wait for health
+  - switch LiteLLM to `agent-mode`
+  - `general` routes to Spark SuperGemma NVFP4
+  - `coder` routes to Spark Qwen FP8
+- **Benchmark mode** (`spark-pause.sh`):
+  - switch LiteLLM to `benchmark-mode`
+  - stop Spark `vLLM` services
+  - `general` routes to hosted OpenRouter
+  - `coder` routes to hosted OpenRouter
 
-Pause/resume cycle:
-
-- **Agent mode** (`spark-resume.sh`): SSHes with `ssh -tt` so sudo can prompt, writes `/etc/ollama.env` with `OLLAMA_NUM_PARALLEL=2`, `OLLAMA_MAX_LOADED_MODELS=2`, `OLLAMA_KV_CACHE_TYPE=q8_0`, `OLLAMA_FLASH_ATTENTION=1`, then `systemctl restart ollama`. No `daemon-reload` — the override.conf is untouched.
-- **Benchmark mode** (`spark-pause.sh`): SSHes with `ssh -tt`, rewrites `/etc/ollama.env` to an empty (comment-only) file, then `systemctl restart ollama`. Stock Ollama defaults + pinned `OLLAMA_HOST`.
-
-Contract for future edits: never put agent tunings in `override.conf` and never put `OLLAMA_HOST` in `/etc/ollama.env`. Keep the two files single-purpose.
+Contract for future edits: pause/resume scripts should only flip LiteLLM mode and Spark-local services. Do not make them restart Hermes or OpenClaw again unless the user explicitly asks for that behavior back.
 
 ### Model roles
 
-Two models, two roles, referenced from three places (`hermes/cli-config.yaml`, `openclaw/config.json`, and the Modelfiles). Keep model IDs in sync across all of them.
+Two stable logical model names are exposed to both agents through LiteLLM:
 
-- `supergemma4:26b-q8` — general / primary. Modelfile sets `num_ctx 8192`, `temperature 0.6`. ~28 GB.
-- `qwen3-coder-next:q6k` — coding / fallback. Modelfile sets `num_ctx 32768`, `temperature 0.3`. ~65 GB.
+- `general`
+- `coder`
 
-Hermes has `smart_model_routing` that sends short/simple turns to SuperGemma4 and longer/code-heavy turns to the Qwen coder. OpenClaw uses SuperGemma4 as primary with the Qwen coder as a named fallback.
+There are also hidden hosted aliases for explicit fallbacks:
 
-### API endpoint quirk
+- `general-cloud`
+- `coder-cloud`
 
-Hermes connects via the **OpenAI-compatible** endpoint (`/v1`, `provider: custom`, `api_key: "ollama-local"`).
-OpenClaw connects via the **native Ollama** endpoint (no `/v1`, `"api": "ollama"`) — the comment in `openclaw/config.json` says this is for reliable tool calling. Don't "unify" these without understanding why they diverge.
+Hermes defaults to `coder` and down-routes quick/simple turns to `general` via `smart_model_routing`. OpenClaw defaults to `general` and falls back to `coder`, then the hidden cloud aliases.
 
 ### Config deployment flow
 
-Configs live in the repo (`hermes/cli-config.yaml`, `openclaw/config.json`) but the running agents read them from `~/.hermes/` and `~/.openclaw/`. `mba-deploy.sh` is the one-way copy step — **edits to `~/.hermes/cli-config.yaml` directly will be overwritten on the next deploy**. Edit the repo copy, commit, re-deploy.
+Repo configs live under:
 
-### Model files
+- `hermes/cli-config.yaml`
+- `openclaw/config.json`
+- `litellm/agent-mode.yaml`
+- `litellm/benchmark-mode.yaml`
 
-Modelfiles in `ollama/` reference absolute paths under `/srv/models/...` on the Spark. This path is deliberate: `/home/carlid` is mode 750 and the `ollama` system user cannot traverse it, so `ollama create` can't read GGUFs from there. `/srv/models` is world-readable and outside `/home` entirely. If you change where GGUFs are downloaded, update both the Modelfile `FROM` line and `MODEL_DIR` in `spark-setup.sh`.
+`mba-deploy.sh` stages them into `~/.spark-agents/`, then copies the live agent configs into `~/.hermes/` and `~/.openclaw/`. **Edits to `~/.hermes/cli-config.yaml` or `~/.openclaw/config.json` directly will be overwritten on the next deploy.**
+
+### Spark model files
+
+Spark-local model repos live under `/srv/models`:
+
+- `/srv/models/supergemma4-nvfp4`
+- `/srv/models/qwen3-coder-next-fp8`
+
+The systemd unit templates in `systemd/` render those paths into the installed `vLLM` service definitions. If you change the download location, update both `spark-setup.sh` and the rendered service templates.
