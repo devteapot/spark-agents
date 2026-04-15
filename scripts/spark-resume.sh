@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
-# spark-resume.sh — Configure Ollama for agents, preload models, start agents on MBA
+# spark-resume.sh — Apply agent Ollama tunings on Spark, preload models, start agents on MBA
 #
-# Run this on the MBA after you're done with direct inference/benchmarking.
-# It SSHes into the Spark to apply agent-optimized Ollama settings, restarts Ollama,
-# preloads both models, then starts both agents on the MBA.
+# Run this on the MBA when you're ready to switch from direct inference/benchmarking
+# back to agent serving. It SSHes to the Spark, rewrites /etc/ollama.env with
+# agent-optimized settings, restarts Ollama, preloads both models, then starts
+# Hermes and OpenClaw locally.
+#
+# /etc/ollama.env is loaded via the systemd override installed by spark-setup.sh,
+# so nothing else in systemd needs touching. OLLAMA_HOST stays pinned in
+# override.conf and is never rewritten.
+#
+# The sudo calls on the Spark need a TTY, so ssh uses -tt. You'll be prompted
+# for your Spark sudo password once.
 #
 # Usage: spark-resume.sh
 
@@ -28,32 +36,23 @@ log()  { echo -e "${GREEN}[spark-resume]${NC} $*"; }
 warn() { echo -e "${YELLOW}[spark-resume]${NC} $*"; }
 err()  { echo -e "${RED}[spark-resume]${NC} $*" >&2; }
 
-# --- 1. Apply agent Ollama config on Spark and restart ---
-log "Applying agent Ollama settings on Spark and restarting..."
-ssh "${SPARK_USER}@${SPARK_HOST}" bash -s << 'REMOTE_EOF'
-    OLLAMA_ENV="${HOME}/.ollama/environment"
-    mkdir -p "${HOME}/.ollama"
+# --- 1. Apply agent tunings on Spark and restart Ollama ---
+log "Writing agent /etc/ollama.env on Spark and restarting Ollama..."
+ssh -tt "${SPARK_USER}@${SPARK_HOST}" bash -s << 'REMOTE_EOF'
+set -euo pipefail
 
-    cat > "${OLLAMA_ENV}" << 'ENVEOF'
-OLLAMA_HOST=0.0.0.0
+sudo tee /etc/ollama.env > /dev/null << 'ENVEOF'
+# Managed by spark-resume.sh — agent serving mode.
+# Two concurrent slots (one per agent), both models pinned, Q8 KV cache, flash attn.
 OLLAMA_NUM_PARALLEL=2
 OLLAMA_MAX_LOADED_MODELS=2
 OLLAMA_KV_CACHE_TYPE=q8_0
 OLLAMA_FLASH_ATTENTION=1
 ENVEOF
 
-    echo "[remote] Agent Ollama environment written to ${OLLAMA_ENV}"
-
-    # Restart Ollama with new settings
-    if command -v systemctl > /dev/null 2>&1 && systemctl is-active ollama > /dev/null 2>&1; then
-        sudo systemctl restart ollama
-        echo "[remote] Ollama restarted via systemctl."
-    else
-        pkill -f "ollama serve" 2>/dev/null || true
-        sleep 1
-        nohup ollama serve > /tmp/ollama.log 2>&1 &
-        echo "[remote] Ollama restarted manually."
-    fi
+echo "[remote] /etc/ollama.env updated with agent tunings."
+sudo systemctl restart ollama
+echo "[remote] Ollama restarted."
 REMOTE_EOF
 
 # --- 2. Wait for Ollama to come back up ---
@@ -61,7 +60,7 @@ log "Waiting for Ollama to come online..."
 for i in $(seq 1 20); do
     if curl -sf "${SPARK_OLLAMA}/api/version" > /dev/null 2>&1; then
         VERSION=$(curl -sf "${SPARK_OLLAMA}/api/version" | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','?'))" 2>/dev/null || echo "?")
-        log "Ollama is online (v${VERSION}) with agent settings."
+        log "Ollama is online (v${VERSION}) with agent tunings."
         break
     fi
     if [ $i -eq 20 ]; then
@@ -77,14 +76,12 @@ preload_model() {
     local model="$1"
     log "Preloading ${model}..."
 
-    # Send a minimal generate request to trigger model loading
-    # keep_alive=-1 keeps it loaded indefinitely
+    # keep_alive=-1 keeps the model resident indefinitely
     curl -sf "${SPARK_OLLAMA}/api/generate" \
         -d "{\"model\": \"${model}\", \"prompt\": \"hello\", \"keep_alive\": -1}" \
         > /dev/null 2>&1 &
     local curl_pid=$!
 
-    # Wait for model to appear in loaded list
     local elapsed=0
     while [ $elapsed -lt $LOAD_TIMEOUT ]; do
         if curl -sf "${SPARK_OLLAMA}/api/ps" 2>/dev/null | grep -q "${model}"; then
@@ -157,7 +154,7 @@ fi
 # --- 7. Done ---
 echo ""
 log "All systems go."
-log "  Ollama settings: NUM_PARALLEL=2, KV_CACHE=q8_0, FLASH_ATTENTION=1"
+log "  Ollama tunings: NUM_PARALLEL=2, MAX_LOADED=2, KV_CACHE=q8_0, FLASH_ATTN=1"
 log "  Hermes Agent → ${SUPERGEMMA_MODEL} (general intelligence)"
 log "  OpenClaw     → ${SUPERGEMMA_MODEL} (primary) / ${QWEN_MODEL} (coding)"
 log "  Spark Ollama → ${SPARK_OLLAMA}"

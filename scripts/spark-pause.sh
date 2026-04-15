@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
-# spark-pause.sh — Stop agents on MBA, unload models, restore Ollama defaults on Spark
+# spark-pause.sh — Stop agents on MBA, unload models, clear agent tunings on Spark
 #
 # Run this on the MBA before using the Spark for direct inference/benchmarking.
-# It gracefully stops both agents, unloads agent models, then restarts Ollama
-# on the Spark with CLEAN defaults (no agent overrides) so benchmarks are unaffected.
+# It gracefully stops both agents, unloads the agent models, then SSHes to the
+# Spark, clears /etc/ollama.env (agent tunings), and restarts Ollama so it comes
+# back up with stock defaults + OLLAMA_HOST (from the systemd override).
+#
+# The systemd override itself is never touched — it was installed once by
+# spark-setup.sh and declares EnvironmentFile=-/etc/ollama.env, so emptying
+# that one file is enough to revert to clean defaults.
+#
+# The sudo calls on the Spark need a TTY, so ssh uses -tt. You'll be prompted
+# for your Spark sudo password once.
 #
 # Usage: spark-pause.sh
 
@@ -15,10 +23,6 @@ SPARK_OLLAMA="http://${SPARK_HOST}:11434"
 
 SUPERGEMMA_MODEL="supergemma4:26b-q8"
 QWEN_MODEL="qwen3-coder-next:q6k"
-
-# Path to the agent env file on the Spark
-SPARK_AGENT_ENV="/home/${SPARK_USER}/.ollama/agent.env"
-SPARK_OLLAMA_ENV="/home/${SPARK_USER}/.ollama/environment"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -78,35 +82,19 @@ curl -sf "${SPARK_OLLAMA}/api/generate" \
     > /dev/null 2>&1 && log "  ${QWEN_MODEL} unloaded." \
     || warn "  ${QWEN_MODEL} was not loaded or failed to unload."
 
-# --- 5. Restart Ollama on Spark with CLEAN defaults ---
-log "Restarting Ollama on Spark with clean defaults (no agent overrides)..."
-ssh "${SPARK_USER}@${SPARK_HOST}" bash -s << 'REMOTE_EOF'
-    # Remove the agent environment file if it exists
-    # The default Ollama environment file stays untouched
-    AGENT_ENV="${HOME}/.ollama/agent.env"
-    OLLAMA_ENV="${HOME}/.ollama/environment"
+# --- 5. Clear /etc/ollama.env on Spark and restart Ollama ---
+log "Clearing agent tunings from /etc/ollama.env and restarting Ollama..."
+ssh -tt "${SPARK_USER}@${SPARK_HOST}" bash -s << 'REMOTE_EOF'
+set -euo pipefail
 
-    # If the current environment is the agent one, restore defaults
-    if [ -f "${OLLAMA_ENV}" ] && grep -q "OLLAMA_NUM_PARALLEL" "${OLLAMA_ENV}" 2>/dev/null; then
-        # Back up and remove agent overrides — restore to bare minimum
-        cp "${OLLAMA_ENV}" "${OLLAMA_ENV}.agent.bak"
-        # Only keep OLLAMA_HOST so Ollama stays network-accessible
-        echo 'OLLAMA_HOST=0.0.0.0' > "${OLLAMA_ENV}"
-        echo "[remote] Restored clean Ollama environment (kept OLLAMA_HOST=0.0.0.0)"
-    else
-        echo "[remote] Ollama environment already clean."
-    fi
+sudo tee /etc/ollama.env > /dev/null << 'ENVEOF'
+# Managed by spark-pause.sh — benchmark / stock-default mode.
+# Empty means Ollama uses stock defaults (OLLAMA_HOST stays pinned in override.conf).
+ENVEOF
 
-    # Restart Ollama
-    if command -v systemctl > /dev/null 2>&1 && systemctl is-active ollama > /dev/null 2>&1; then
-        sudo systemctl restart ollama
-        echo "[remote] Ollama restarted via systemctl."
-    else
-        pkill -f "ollama serve" 2>/dev/null || true
-        sleep 1
-        nohup ollama serve > /tmp/ollama.log 2>&1 &
-        echo "[remote] Ollama restarted manually."
-    fi
+echo "[remote] /etc/ollama.env cleared (stock defaults)."
+sudo systemctl restart ollama
+echo "[remote] Ollama restarted."
 REMOTE_EOF
 
 # --- 6. Wait for Ollama to come back up ---
@@ -121,8 +109,11 @@ done
 
 # --- 7. Confirm ---
 echo ""
-log "All done. Agents stopped, models unloaded, Ollama running with clean defaults."
+log "All done. Agents stopped, models unloaded, Ollama running with stock defaults."
 log "The Spark is ready for benchmarking — no agent overrides active."
 log ""
-log "Current Ollama settings: stock defaults + OLLAMA_HOST=0.0.0.0"
+log "Current config:"
+log "  Override (static):  OLLAMA_HOST=0.0.0.0:11434"
+log "  Env file (cleared): /etc/ollama.env is empty"
+log ""
 log "Run spark-resume.sh when you're ready to switch back to agents."

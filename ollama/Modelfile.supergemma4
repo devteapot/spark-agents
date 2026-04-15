@@ -5,12 +5,15 @@
 # Download the GGUF first:
 #   huggingface-cli download Jiunsong/supergemma4-26b-abliterated-multimodal-gguf-8bit \
 #     supergemma4-26b-abliterated-multimodal-Q8_0.gguf \
-#     --local-dir /home/carlid/models/supergemma4-26b
+#     --local-dir /srv/models/supergemma4-26b
 #
 # Then build:
 #   ollama create supergemma4:26b-q8 -f Modelfile.supergemma4
+#
+# /srv/models is a shared-readable location outside /home so the ollama
+# system user can read the GGUF without needing access to /home/carlid.
 
-FROM /home/carlid/models/supergemma4-26b/supergemma4-26b-abliterated-multimodal-Q8_0.gguf
+FROM /srv/models/supergemma4-26b/supergemma4-26b-abliterated-multimodal-Q8_0.gguf
 
 # Context window — 8192 keeps KV cache lean for dual-agent concurrency
 PARAMETER num_ctx 8192

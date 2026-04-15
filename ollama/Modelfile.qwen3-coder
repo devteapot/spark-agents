@@ -5,12 +5,15 @@
 # Download the GGUF first:
 #   huggingface-cli download unsloth/Qwen3-Coder-Next-GGUF \
 #     Qwen3-Coder-Next-Q6_K.gguf \
-#     --local-dir /home/carlid/models/qwen3-coder-next
+#     --local-dir /srv/models/qwen3-coder-next
 #
 # Then build:
 #   ollama create qwen3-coder-next:q6k -f Modelfile.qwen3-coder
+#
+# /srv/models is a shared-readable location outside /home so the ollama
+# system user can read the GGUF without needing access to /home/carlid.
 
-FROM /home/carlid/models/qwen3-coder-next/Qwen3-Coder-Next-Q6_K.gguf
+FROM /srv/models/qwen3-coder-next/Qwen3-Coder-Next-Q6_K.gguf
 
 # Context window — 32768 for multi-file coding context while keeping memory in check
 PARAMETER num_ctx 32768
