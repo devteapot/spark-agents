@@ -74,6 +74,28 @@ start_process_if_needed() {
     fi
 }
 
+hermes_gateway_configured() {
+    python3 - "${HOME}/.hermes/cli-config.yaml" <<'PY'
+import sys
+from pathlib import Path
+
+try:
+    import yaml
+except Exception:
+    raise SystemExit(1)
+
+path = Path(sys.argv[1])
+if not path.exists():
+    raise SystemExit(1)
+
+data = yaml.safe_load(path.read_text()) or {}
+gateway = data.get("gateway")
+if isinstance(gateway, dict) and gateway:
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
 if [ ! -f "${HERMES_REPO_CONFIG}" ] || [ ! -f "${OPENCLAW_REPO_CONFIG}" ] || [ ! -f "${LITELLM_AGENT_REPO_CONFIG}" ] || [ ! -f "${LITELLM_BENCHMARK_REPO_CONFIG}" ]; then
     err "Repo config files are missing. Run this from inside the spark-agents checkout."
     exit 1
@@ -138,10 +160,13 @@ cp "${RUNTIME_OPENCLAW_DIR}/config.json" "${HOME}/.openclaw/config.json"
 log "Installed ~/.openclaw/config.json"
 
 section "6/7  Restarting agents on the new router-backed configs"
-stop_process_if_running "hermes" "hermes stop 2>/dev/null"
+if hermes_gateway_configured; then
+    stop_process_if_running "hermes" "hermes gateway stop 2>/dev/null"
+else
+    log "Hermes gateway not configured; skipping Hermes background start."
+fi
 stop_process_if_running "openclaw" "openclaw stop 2>/dev/null"
 
-start_process_if_needed "hermes" "hermes start" "/tmp/hermes-agent.log"
 start_process_if_needed "openclaw" "openclaw start" "/tmp/openclaw.log"
 
 section "7/7  Installing operational scripts"
