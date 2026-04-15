@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-venv && \
     rm -rf /var/lib/apt/lists/*
 
-RUN python3 -m pip install --break-system-packages --upgrade pip setuptools wheel && \
+RUN python3 -m pip install --break-system-packages --upgrade setuptools wheel packaging && \
     python3 -m pip install --break-system-packages \
         --index-url "${TORCH_CUDA_INDEX_URL}" \
         torch==2.10.0 \
