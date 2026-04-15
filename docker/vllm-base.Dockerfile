@@ -32,5 +32,6 @@ RUN pip install --upgrade pip setuptools wheel packaging && \
         torchaudio==2.10.0 \
         torchvision==0.25.0 && \
     pip install \
-        "${VLLM_CUDA_WHEEL_URL}" \
+        "${VLLM_CUDA_WHEEL_URL}" && \
+    pip install --upgrade --no-deps \
         "transformers>=5.5.0,<5.6"
