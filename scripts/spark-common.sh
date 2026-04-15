@@ -3,6 +3,9 @@
 SPARK_HOST="${SPARK_HOST:-slopinator-s-1.local}"
 SPARK_USER="${SPARK_USER:-carlid}"
 
+PATH="${HOME}/.local/bin:${HOME}/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
+export PATH
+
 SPARK_SUPERGEMMA_V1_URL="http://${SPARK_HOST}:8001/v1"
 SPARK_QWEN_V1_URL="http://${SPARK_HOST}:8002/v1"
 LITELLM_BASE_URL="${LITELLM_BASE_URL:-http://127.0.0.1:4000}"

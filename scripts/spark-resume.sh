@@ -16,8 +16,11 @@ ensure_litellm_installed
 
 log "Starting Spark Qwen vLLM first..."
 spark_remote_sudo <<'REMOTE_EOF'
+systemctl daemon-reload
 systemctl reset-failed vllm-qwen.service vllm-supergemma.service || true
-systemctl start vllm-qwen.service
+pkill -f '/opt/spark-agents-vllm/bin/vllm serve /srv/models/qwen3-coder-next-fp8' || true
+pkill -f '/opt/spark-agents-vllm/bin/vllm serve /srv/models/supergemma4-nvfp4' || true
+systemctl restart vllm-qwen.service
 REMOTE_EOF
 
 log "Waiting for Spark Qwen vLLM..."
@@ -26,7 +29,7 @@ healthcheck_tool_call "${SPARK_QWEN_V1_URL}" "${QWEN_MODEL_ID}" "Spark Qwen vLLM
 
 log "Starting Spark SuperGemma vLLM..."
 spark_remote_sudo <<'REMOTE_EOF'
-systemctl start vllm-supergemma.service
+systemctl restart vllm-supergemma.service
 REMOTE_EOF
 
 log "Waiting for Spark SuperGemma vLLM..."
