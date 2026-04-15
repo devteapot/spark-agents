@@ -51,10 +51,12 @@ cd ~/spark-agents
 ./scripts/spark-setup.sh
 ```
 
-This installs the Spark-side `vLLM` runtime, downloads both model repos under `/srv/models`, applies the required SuperGemma NVFP4 patches, and installs:
+This downloads both model repos under `/srv/models`, builds the Spark-side `vLLM` container images, and installs:
 
 - `vllm-supergemma.service`
 - `vllm-qwen.service`
+
+The two Spark services still bind directly on the host at `:8001` and `:8002`, but they now run as Docker containers under systemd instead of using a host-managed Python runtime.
 
 ### MBA (one-time or after config/script edits)
 

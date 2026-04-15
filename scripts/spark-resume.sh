@@ -14,18 +14,24 @@ require_command python3
 ensure_runtime_dirs
 ensure_litellm_installed
 
-log "Starting Spark vLLM services..."
+log "Starting Spark Qwen vLLM first..."
 spark_remote_sudo <<'REMOTE_EOF'
-systemctl start vllm-supergemma.service vllm-qwen.service
+systemctl reset-failed vllm-qwen.service vllm-supergemma.service || true
+systemctl start vllm-qwen.service
+REMOTE_EOF
+
+log "Waiting for Spark Qwen vLLM..."
+wait_for_models_endpoint "${SPARK_QWEN_V1_URL}" "Spark Qwen vLLM" 300
+healthcheck_tool_call "${SPARK_QWEN_V1_URL}" "${QWEN_MODEL_ID}" "Spark Qwen vLLM"
+
+log "Starting Spark SuperGemma vLLM..."
+spark_remote_sudo <<'REMOTE_EOF'
+systemctl start vllm-supergemma.service
 REMOTE_EOF
 
 log "Waiting for Spark SuperGemma vLLM..."
 wait_for_models_endpoint "${SPARK_SUPERGEMMA_V1_URL}" "Spark SuperGemma vLLM" 300
 healthcheck_chat_completion "${SPARK_SUPERGEMMA_V1_URL}" "${SUPERGEMMA_MODEL_ID}" "Spark SuperGemma vLLM"
-
-log "Waiting for Spark Qwen vLLM..."
-wait_for_models_endpoint "${SPARK_QWEN_V1_URL}" "Spark Qwen vLLM" 300
-healthcheck_tool_call "${SPARK_QWEN_V1_URL}" "${QWEN_MODEL_ID}" "Spark Qwen vLLM"
 
 log "Switching LiteLLM to agent-mode..."
 restart_litellm "agent-mode"

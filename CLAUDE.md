@@ -19,7 +19,7 @@ All scripts live in `scripts/` and are idempotent.
 
 | Command | Where to run | What it does |
 |---|---|---|
-| `./scripts/spark-setup.sh` | Spark, once | Installs `hf` via pipx, downloads the NVFP4/FP8 model repos into `/srv/models`, installs a dedicated vLLM virtualenv under `/opt/spark-agents-vllm`, applies the required SuperGemma NVFP4 vLLM patches, writes the Spark systemd units, `daemon-reload`, and enables them. |
+| `./scripts/spark-setup.sh` | Spark, once | Installs `hf` via pipx, validates Docker availability, downloads the NVFP4/FP8 model repos into `/srv/models`, builds custom Spark-side `vLLM` container images, writes the Spark systemd units, `daemon-reload`, and enables them. |
 | `./scripts/mba-deploy.sh` | MBA, after config/script edits | Stages `hermes/`, `openclaw/`, and `litellm/` configs into `~/.spark-agents`, restarts LiteLLM in the active mode, copies the live configs into `~/.hermes/` + `~/.openclaw/`, restarts Hermes/OpenClaw once, and installs `spark-*.sh` into `~/bin`. |
 | `spark-resume.sh` | MBA, daily | Starts both Spark `vLLM` services over SSH using a single remote `sudo bash -se` path, waits for `/v1/models`, runs a basic chat + tool-call health check, then switches LiteLLM into `agent-mode`. Hermes/OpenClaw stay running. |
 | `spark-pause.sh` | MBA, before benchmarking | Switches LiteLLM into `benchmark-mode` first, then stops both Spark `vLLM` services over SSH. Hermes/OpenClaw stay running. |
@@ -81,4 +81,4 @@ Spark-local model repos live under `/srv/models`:
 - `/srv/models/supergemma4-nvfp4`
 - `/srv/models/qwen3-coder-next-fp8`
 
-The systemd unit templates in `systemd/` render those paths into the installed `vLLM` service definitions. If you change the download location, update both `spark-setup.sh` and the rendered service templates.
+The systemd unit templates in `systemd/` render those paths into Docker-backed `vLLM` service definitions. The images are built from the repo Dockerfiles in `docker/`. If you change the download location, update both `spark-setup.sh` and the rendered service templates.
