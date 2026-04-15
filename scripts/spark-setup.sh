@@ -3,7 +3,7 @@
 #
 # Run this on the DGX Spark (carlid@slopinator-s-1.local) once.
 # It will:
-#   1. Install huggingface-cli via pipx (shared install under /opt/pipx)
+#   1. Install hf (huggingface-hub CLI) via pipx (shared install under /opt/pipx)
 #   2. Create /srv/models (shared-readable, outside /home)
 #   3. Download both model GGUFs into /srv/models
 #   4. Install a systemd override for Ollama that loads tunables from /etc/ollama.env
@@ -46,11 +46,13 @@ err()  { echo -e "${RED}[spark-setup]${NC} $*" >&2; }
 log "This script needs sudo for pipx install, /srv/models, and /etc/systemd writes."
 sudo -v
 
-# --- 1. Install huggingface-cli via pipx (system-wide) ---
-if command -v huggingface-cli > /dev/null 2>&1; then
-    log "huggingface-cli already installed at $(command -v huggingface-cli)"
+# --- 1. Install hf (huggingface-hub CLI) via pipx (system-wide) ---
+# Note: the old `huggingface-cli` name was deprecated in huggingface-hub 1.10.
+# Ships as `hf` now. Same args for `hf download`.
+if command -v hf > /dev/null 2>&1; then
+    log "hf already installed at $(command -v hf)"
 else
-    log "Installing huggingface-cli via pipx..."
+    log "Installing hf via pipx..."
     if ! command -v pipx > /dev/null 2>&1; then
         sudo apt-get update -qq
         sudo apt-get install -y pipx
@@ -58,7 +60,7 @@ else
     # Shared install: venv in /opt/pipx, CLI symlinked into /usr/local/bin.
     sudo env PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin \
         pipx install huggingface-hub
-    log "huggingface-cli installed at $(command -v huggingface-cli)"
+    log "hf installed at $(command -v hf)"
 fi
 
 # --- 2. Create /srv/models (shared-readable) ---
@@ -79,7 +81,7 @@ log "Downloading SuperGemma4 26B Q8_0 GGUF (~28 GB)..."
 if [ -f "${MODEL_DIR}/supergemma4-26b/supergemma4-26b-abliterated-multimodal-Q8_0.gguf" ]; then
     warn "SuperGemma4 GGUF already exists, skipping download."
 else
-    huggingface-cli download \
+    hf download \
         Jiunsong/supergemma4-26b-abliterated-multimodal-gguf-8bit \
         supergemma4-26b-abliterated-multimodal-Q8_0.gguf \
         --local-dir "${MODEL_DIR}/supergemma4-26b"
@@ -91,7 +93,7 @@ log "Downloading Qwen3-Coder-Next Q6_K GGUF (~65 GB)..."
 if [ -f "${MODEL_DIR}/qwen3-coder-next/Qwen3-Coder-Next-Q6_K.gguf" ]; then
     warn "Qwen3-Coder-Next GGUF already exists, skipping download."
 else
-    huggingface-cli download \
+    hf download \
         unsloth/Qwen3-Coder-Next-GGUF \
         Qwen3-Coder-Next-Q6_K.gguf \
         --local-dir "${MODEL_DIR}/qwen3-coder-next"

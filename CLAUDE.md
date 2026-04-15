@@ -17,7 +17,7 @@ All scripts live in `scripts/` and are idempotent.
 
 | Command | Where to run | What it does |
 |---|---|---|
-| `./scripts/spark-setup.sh` | Spark, once | Installs `huggingface-cli` via pipx (shared, `/opt/pipx` → `/usr/local/bin`), creates `/srv/models`, downloads both GGUFs, writes the systemd override + baseline `/etc/ollama.env`, `daemon-reload`, restart, `ollama create` both tags. Prompts for sudo password once. |
+| `./scripts/spark-setup.sh` | Spark, once | Installs `hf` (huggingface-hub CLI) via pipx (shared, `/opt/pipx` → `/usr/local/bin`), creates `/srv/models`, downloads both GGUFs, writes the systemd override + baseline `/etc/ollama.env`, `daemon-reload`, restart, `ollama create` both tags. Prompts for sudo password once. |
 | `./scripts/mba-deploy.sh` | MBA, after each config change | Stops Hermes, copies `hermes/cli-config.yaml` → `~/.hermes/`, `openclaw/config.json` → `~/.openclaw/`, installs `spark-*.sh` into `~/bin`, pings Spark Ollama. |
 | `spark-resume.sh` | MBA, daily | `ssh -tt` to Spark → sudo-writes agent `/etc/ollama.env` (`NUM_PARALLEL=2`, `MAX_LOADED_MODELS=2`, `KV_CACHE_TYPE=q8_0`, `FLASH_ATTENTION=1`) → `systemctl restart ollama` → preloads both models with `keep_alive: -1` → starts `hermes` and `openclaw` locally. Prompts for Spark sudo password once. |
 | `spark-pause.sh` | MBA, before benchmarking | Stops local agents, unloads both models (`keep_alive: 0`), `ssh -tt` to Spark → sudo-clears `/etc/ollama.env` → `systemctl restart ollama`. |

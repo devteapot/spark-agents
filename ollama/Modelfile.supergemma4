@@ -3,7 +3,7 @@
 # Source: https://huggingface.co/Jiunsong/supergemma4-26b-abliterated-multimodal-gguf-8bit
 #
 # Download the GGUF first:
-#   huggingface-cli download Jiunsong/supergemma4-26b-abliterated-multimodal-gguf-8bit \
+#   hf download Jiunsong/supergemma4-26b-abliterated-multimodal-gguf-8bit \
 #     supergemma4-26b-abliterated-multimodal-Q8_0.gguf \
 #     --local-dir /srv/models/supergemma4-26b
 #
