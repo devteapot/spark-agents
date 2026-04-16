@@ -1,5 +1,6 @@
 litellm_settings:
   ssl_verify: false
+  drop_params: true
 
 model_list:
   - model_name: general
