@@ -124,7 +124,7 @@ data.pop("_comment", None)
 
 gateway = data.setdefault("gateway", {})
 gateway.setdefault("mode", "local")
-gateway.setdefault("bind", "loopback")
+gateway.setdefault("bind", "0.0.0.0")
 gateway.setdefault("port", 18789)
 
 dst.write_text(json.dumps(data, indent=2) + "\n")
@@ -241,6 +241,7 @@ echo "  LiteLLM endpoint:  ${LITELLM_V1_URL}"
 echo "  Router mode:       ${CURRENT_MODE}"
 echo "  Hermes config:     ${HOME}/.hermes/cli-config.yaml"
 echo "  OpenClaw config:   ${HOME}/.openclaw/config.json"
+echo "  OpenClaw gateway:  http://0.0.0.0:18789/"
 echo "  LiteLLM configs:   ${LITELLM_RUNTIME_DIR}"
 echo ""
 echo "  Next steps:"
