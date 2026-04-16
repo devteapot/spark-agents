@@ -1,5 +1,5 @@
 litellm_settings:
-  ssl_verify: ~
+  ssl_verify: false
 
 model_list:
   - model_name: general
