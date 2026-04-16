@@ -10,7 +10,7 @@ This is **not** an application. It is a configuration + deployment repo for a tw
   - SuperGemma4 26B MoE NVFP4 on `:8001` (16 GiB weights, `--quantization modelopt`, patched gemma4.py for MoE scale keys)
 - **MacBook Air** (`sloppy@sloppy-mba.local`) — runs Hermes, OpenClaw, and a local `LiteLLM` router on `127.0.0.1:4000`
 
-GPU memory budget: SuperGemma at `0.92` of the GB10's 128 GiB unified memory, with 256K context (`--max-model-len 262144`) and fp8 KV cache.
+GPU memory budget: SuperGemma at `0.92` of the GB10's 128 GiB unified memory (~118 GiB), with 256K context (`--max-model-len 262144`), fp8 KV cache (~800K tokens), and 8 concurrent request slots (`--max-num-seqs 8`).
 
 The repo is cloned to both machines and scripts are run on whichever side they target. Editing configs or scripts means: commit, push, pull on the other box, then rerun `mba-deploy.sh` on the MBA so the staged runtime configs in `~/.spark-agents/` are refreshed and the live configs in `~/.hermes/` + `~/.openclaw/` are replaced.
 
@@ -20,9 +20,9 @@ All scripts live in `scripts/` and are idempotent.
 
 | Command | Where to run | What it does |
 |---|---|---|
-| `./scripts/spark-setup.sh` | Spark, once | Installs `hf` via pipx, validates Docker availability, downloads the SuperGemma model into `/srv/models`, builds the vLLM container images, migrates any legacy systemd units, and installs `docker-compose.yaml` into `/srv/spark-agents`. |
+| `./scripts/spark-setup.sh` | Spark, once | Installs `hf` via pipx, validates Docker availability, downloads the SuperGemma model into `/srv/models`, builds the vLLM container images, and migrates any legacy systemd units. |
 | `./scripts/mba-deploy.sh` | MBA, after config/script edits | Stages `hermes/`, `openclaw/`, and `litellm/` configs into `~/.spark-agents`, restarts LiteLLM in the active mode, copies the live configs into `~/.hermes/` + `~/.openclaw/`, restarts Hermes/OpenClaw once, and installs `spark-*.sh` into `~/bin`. |
-| `spark-resume.sh` | MBA, daily | Starts the Spark vLLM service via `docker compose up -d` over SSH, waits for `/v1/models`, runs a chat health check, then switches LiteLLM into `agent-mode`. Hermes/OpenClaw stay running. |
+| `spark-resume.sh` | MBA, daily | Starts the Spark vLLM service via `docker compose up -d` over SSH (compose file lives in the Spark repo checkout at `~/spark-agents/spark/`), waits for `/v1/models`, runs a chat health check, then switches LiteLLM into `agent-mode`. Hermes/OpenClaw stay running. |
 | `spark-pause.sh` | MBA, before reclaiming the Spark GPU | Switches LiteLLM into `offload-mode` first, then stops the Spark vLLM service via `docker compose down` over SSH. Hermes/OpenClaw stay running. |
 | `spark-status.sh` | MBA, anytime | Reports LiteLLM health/mode, Spark vLLM health, and Hermes/OpenClaw process state. Read-only. |
 
@@ -72,11 +72,11 @@ Repo configs live under:
 
 `mba-deploy.sh` stages them into `~/.spark-agents/`, then copies the live agent configs into `~/.hermes/` and `~/.openclaw/`. **Edits to `~/.hermes/config.yaml` or `~/.openclaw/config.json` directly will be overwritten on the next deploy.**
 
-### Spark model files
+### Spark vLLM service
 
-The Spark-local model repo lives under `/srv/models/supergemma4-nvfp4`.
+The Docker Compose file at `spark/docker-compose.yaml` runs directly from the repo checkout on the Spark (`~/spark-agents/spark/`). It mounts the model from `/srv/models/supergemma4-nvfp4` and the KV cache from `/srv/spark-agents/cache/supergemma`.
 
-The Docker Compose file at `spark/docker-compose.yaml` (installed to `/srv/spark-agents/docker-compose.yaml` by `spark-setup.sh`) mounts this path and runs the vLLM service. The image is built from the Dockerfiles in `docker/`.
+Resume/pause scripts SSH to the Spark and run `docker compose up -d` / `docker compose down` from there. No sudo needed — the `carlid` user is in the `docker` group.
 
 ### Docker images
 
@@ -89,3 +89,4 @@ Two images, both built by `spark-setup.sh`:
 
 - `litellm_settings.ssl_verify` must be `false`. Earlier LiteLLM versions needed `~` (YAML null) but the current version creates an SSL context from `None`, breaking plain HTTP connections. `false` correctly disables SSL for `http://` endpoints.
 - The Spark `api_base` URLs use the static IP (`192.168.1.96`) rather than mDNS (`slopinator-s-1.local`) because Python's asyncio resolver does not support `.local` mDNS on macOS.
+- The LiteLLM router runs in a Docker container on the MBA with `network_mode: host`. Docker Desktop's "Enable host networking" setting must be enabled for the container to reach the Spark's LAN IP.
