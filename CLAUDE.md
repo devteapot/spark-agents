@@ -96,5 +96,5 @@ Three images, all built by `spark-setup.sh`:
 
 ### LiteLLM notes
 
-- `litellm_settings.ssl_verify` must be `~` (YAML null / Python None), **not** `false`. In LiteLLM's aiohttp transport, `ssl=False` means "use SSL but skip cert check" which breaks plain HTTP connections. `None` means "default behavior" (no SSL for `http://`).
+- `litellm_settings.ssl_verify` must be `false`. Earlier LiteLLM versions needed `~` (YAML null) but the current version creates an SSL context from `None`, breaking plain HTTP connections. `false` correctly disables SSL for `http://` endpoints.
 - The Spark `api_base` URLs use the static IP (`192.168.1.96`) rather than mDNS (`slopinator-s-1.local`) because Python's asyncio resolver does not support `.local` mDNS on macOS.
