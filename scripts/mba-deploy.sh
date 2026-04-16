@@ -175,11 +175,12 @@ log "LiteLLM active mode: ${CURRENT_MODE}"
 
 section "3/7  Deploying Hermes config"
 mkdir -p "${HOME}/.hermes"
-if [ -f "${HOME}/.hermes/cli-config.yaml" ]; then
-    cp "${HOME}/.hermes/cli-config.yaml" "${HOME}/.hermes/cli-config.yaml.bak.$(date +%Y%m%d_%H%M%S)"
+if [ -f "${HOME}/.hermes/config.yaml" ]; then
+    cp "${HOME}/.hermes/config.yaml" "${HOME}/.hermes/config.yaml.bak.$(date +%Y%m%d_%H%M%S)"
 fi
-cp "${RUNTIME_HERMES_DIR}/cli-config.yaml" "${HOME}/.hermes/cli-config.yaml"
-log "Installed ~/.hermes/cli-config.yaml"
+cp "${RUNTIME_HERMES_DIR}/cli-config.yaml" "${HOME}/.hermes/config.yaml"
+rm -f "${HOME}/.hermes/cli-config.yaml"
+log "Installed ~/.hermes/config.yaml"
 
 section "4/7  Checking OpenClaw installation"
 if command -v openclaw > /dev/null 2>&1; then
