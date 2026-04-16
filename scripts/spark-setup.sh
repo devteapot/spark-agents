@@ -4,14 +4,13 @@
 # Run this on the DGX Spark once. It will:
 #   1. Install hf (huggingface-hub CLI) via pipx if needed
 #   2. Validate Docker + NVIDIA container runtime availability
-#   3. Create /srv/models and download the two HF model repos
+#   3. Create /srv/models and download the SuperGemma HF model repo
 #   4. Build the Spark-side vLLM container images
-#   5. Install the Spark-side systemd units for SuperGemma and coder
-#   6. Enable the units so spark-resume.sh / spark-pause.sh can manage them
+#   5. Install the docker-compose.yaml into /srv/spark-agents
 #
 # Usage:
 #   ssh carlid@slopinator-s-1.local
-#   cd ~/spark-agents && ./scripts/spark-setup.sh
+#   cd ~/spark-agents && sudo ./scripts/spark-setup.sh
 
 set -euo pipefail
 
@@ -19,18 +18,14 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODEL_DIR="/srv/models"
 STATE_DIR="/srv/spark-agents"
 SUPERGEMMA_DIR="${MODEL_DIR}/supergemma4-nvfp4"
-CODER_DIR="${MODEL_DIR}/qwen3-coder-next-nvfp4"
 SUPERGEMMA_CACHE_DIR="${STATE_DIR}/cache/supergemma"
-CODER_CACHE_DIR="${STATE_DIR}/cache/coder"
 SYSTEMD_DIR="/etc/systemd/system"
 DOCKER_BIN="$(command -v docker || true)"
 SUPERGEMMA_MODEL_REPO="AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4"
-CODER_MODEL_REPO="GadflyII/Qwen3-Coder-Next-NVFP4"
 MODELOPT_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/modelopt_patched.py"
 SERVING_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/serving_chat_patched.py"
 VLLM_BASE_IMAGE="spark-agents/vllm-base:cu132"
 SUPERGEMMA_IMAGE="spark-agents/vllm-supergemma:local"
-CODER_IMAGE="spark-agents/vllm-coder:local"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -40,43 +35,6 @@ NC='\033[0m'
 log()  { echo -e "${GREEN}[spark-setup]${NC} $*"; }
 warn() { echo -e "${YELLOW}[spark-setup]${NC} $*"; }
 err()  { echo -e "${RED}[spark-setup]${NC} $*" >&2; }
-
-render_template() {
-    local template="$1"
-    local destination="$2"
-    local tmp_file
-    tmp_file="$(mktemp)"
-
-    TEMPLATE_PATH="${template}" \
-    DOCKER_BIN_RENDER="${DOCKER_BIN}" \
-    SUPERGEMMA_DIR_RENDER="${SUPERGEMMA_DIR}" \
-    SUPERGEMMA_CACHE_DIR_RENDER="${SUPERGEMMA_CACHE_DIR}" \
-    SUPERGEMMA_IMAGE_RENDER="${SUPERGEMMA_IMAGE}" \
-    CODER_DIR_RENDER="${CODER_DIR}" \
-    CODER_CACHE_DIR_RENDER="${CODER_CACHE_DIR}" \
-    CODER_IMAGE_RENDER="${CODER_IMAGE}" \
-    python3 - <<'PY' > "${tmp_file}"
-import os
-from pathlib import Path
-
-text = Path(os.environ["TEMPLATE_PATH"]).read_text()
-replacements = {
-    "__DOCKER_BIN__": os.environ["DOCKER_BIN_RENDER"],
-    "__SUPERGEMMA_MODEL_PATH__": os.environ["SUPERGEMMA_DIR_RENDER"],
-    "__SUPERGEMMA_CACHE_DIR__": os.environ["SUPERGEMMA_CACHE_DIR_RENDER"],
-    "__SUPERGEMMA_IMAGE__": os.environ["SUPERGEMMA_IMAGE_RENDER"],
-    "__CODER_MODEL_PATH__": os.environ["CODER_DIR_RENDER"],
-    "__CODER_CACHE_DIR__": os.environ["CODER_CACHE_DIR_RENDER"],
-    "__CODER_IMAGE__": os.environ["CODER_IMAGE_RENDER"],
-}
-for needle, value in replacements.items():
-    text = text.replace(needle, value)
-print(text, end="")
-PY
-
-    sudo install -m 0644 "${tmp_file}" "${destination}"
-    rm -f "${tmp_file}"
-}
 
 build_image() {
     local image="$1"
@@ -92,7 +50,7 @@ build_image() {
         "${PROJECT_DIR}"
 }
 
-log "This script needs sudo for /srv, Docker image builds, and /etc/systemd writes."
+log "This script needs sudo for /srv and Docker image builds."
 sudo -v
 
 if ! command -v python3 > /dev/null 2>&1; then
@@ -140,7 +98,7 @@ if [ ! -d "${STATE_DIR}" ]; then
     sudo chmod 755 "${STATE_DIR}"
 fi
 
-sudo mkdir -p "${SUPERGEMMA_DIR}" "${CODER_DIR}" "${SUPERGEMMA_CACHE_DIR}" "${CODER_CACHE_DIR}"
+sudo mkdir -p "${SUPERGEMMA_DIR}" "${SUPERGEMMA_CACHE_DIR}"
 sudo chown -R "$(id -un):$(id -gn)" "${MODEL_DIR}" "${STATE_DIR}"
 
 if [ -f "${SUPERGEMMA_DIR}/config.json" ]; then
@@ -150,15 +108,6 @@ else
     hf download \
         "${SUPERGEMMA_MODEL_REPO}" \
         --local-dir "${SUPERGEMMA_DIR}"
-fi
-
-if [ -f "${CODER_DIR}/config.json" ]; then
-    log "${CODER_MODEL_REPO} already present in ${CODER_DIR}."
-else
-    log "Downloading ${CODER_MODEL_REPO} into ${CODER_DIR}..."
-    hf download \
-        "${CODER_MODEL_REPO}" \
-        --local-dir "${CODER_DIR}"
 fi
 
 build_image \
@@ -172,35 +121,28 @@ build_image \
     --build-arg "MODELOPT_PATCH_URL=${MODELOPT_PATCH_URL}" \
     --build-arg "SERVING_PATCH_URL=${SERVING_PATCH_URL}"
 
-build_image \
-    "${CODER_IMAGE}" \
-    "docker/vllm-coder.Dockerfile" \
-    --build-arg "BASE_IMAGE=${VLLM_BASE_IMAGE}"
-
-log "Installing Spark systemd units..."
-render_template "${PROJECT_DIR}/systemd/vllm-supergemma.service.tpl" "${SYSTEMD_DIR}/vllm-supergemma.service"
-render_template "${PROJECT_DIR}/systemd/vllm-coder.service.tpl" "${SYSTEMD_DIR}/vllm-coder.service"
-
-if [ -f "${SYSTEMD_DIR}/vllm-qwen.service" ]; then
-    log "Removing legacy vllm-qwen.service..."
-    sudo systemctl disable --now vllm-qwen.service >/dev/null 2>&1 || true
-    sudo rm -f "${SYSTEMD_DIR}/vllm-qwen.service"
-fi
-
-log "Reloading systemd and enabling vLLM services..."
+# Migrate from legacy systemd units
+for legacy_unit in vllm-supergemma.service vllm-coder.service vllm-qwen.service; do
+    if [ -f "${SYSTEMD_DIR}/${legacy_unit}" ]; then
+        log "Removing legacy ${legacy_unit}..."
+        sudo systemctl disable --now "${legacy_unit}" >/dev/null 2>&1 || true
+        sudo rm -f "${SYSTEMD_DIR}/${legacy_unit}"
+    fi
+done
 sudo systemctl daemon-reload
-sudo systemctl enable vllm-supergemma.service vllm-coder.service
+
+log "Installing docker-compose.yaml into ${STATE_DIR}..."
+cp "${PROJECT_DIR}/spark/docker-compose.yaml" "${STATE_DIR}/docker-compose.yaml"
 
 echo ""
 log "Setup complete."
 log "  SuperGemma NVFP4 path: ${SUPERGEMMA_DIR}"
-log "  Qwen3-Coder-Next path:${CODER_DIR}"
 log "  State/cache root:     ${STATE_DIR}"
+log "  Compose file:         ${STATE_DIR}/docker-compose.yaml"
 log "  Base image:           ${VLLM_BASE_IMAGE}"
 log "  SuperGemma image:     ${SUPERGEMMA_IMAGE}"
-log "  Coder image:          ${CODER_IMAGE}"
 log ""
 log "Next steps:"
 log "  1. On MBA, run:    ./scripts/mba-deploy.sh"
-log "  2. On MBA, run:    spark-resume.sh   (starts both Spark vLLM services)"
+log "  2. On MBA, run:    spark-resume.sh   (starts Spark vLLM)"
 log "  3. Anytime:        spark-status.sh"

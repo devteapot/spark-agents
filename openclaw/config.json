@@ -5,8 +5,8 @@
     "Location after deploy: ~/.openclaw/config.json (on MBA: sloppy@sloppy-mba.local)",
     "",
     "OpenClaw talks only to the local LiteLLM router on the MBA.",
-    "Stable aliases: general, coder.",
-    "Hidden cloud aliases remain available as hosted fallbacks."
+    "Stable alias: general.",
+    "Hidden cloud alias remains available as hosted fallback."
   ],
 
   "models": {
@@ -20,29 +20,15 @@
             "id": "general",
             "name": "LiteLLM general route",
             "reasoning": true,
-            "contextWindow": 32768,
+            "contextWindow": 262144,
             "maxTokens": 4096
-          },
-          {
-            "id": "coder",
-            "name": "LiteLLM coder route",
-            "reasoning": true,
-            "contextWindow": 32768,
-            "maxTokens": 8192
           },
           {
             "id": "general-cloud",
             "name": "LiteLLM hosted general fallback",
             "reasoning": true,
-            "contextWindow": 32768,
+            "contextWindow": 262144,
             "maxTokens": 4096
-          },
-          {
-            "id": "coder-cloud",
-            "name": "LiteLLM hosted coder fallback",
-            "reasoning": true,
-            "contextWindow": 32768,
-            "maxTokens": 8192
           }
         ]
       }
@@ -54,9 +40,7 @@
       "model": {
         "primary": "mba-litellm/general",
         "fallbacks": [
-          "mba-litellm/coder",
-          "mba-litellm/general-cloud",
-          "mba-litellm/coder-cloud"
+          "mba-litellm/general-cloud"
         ]
       }
     }

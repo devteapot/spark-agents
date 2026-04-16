@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# spark-resume.sh - Restore Spark-local vLLM serving and switch LiteLLM to agent-mode
+# spark-resume.sh - Start Spark vLLM via docker compose and switch LiteLLM to agent-mode
 
 set -euo pipefail
 
@@ -22,22 +22,8 @@ fi
 echo "$$" > "${RESUME_LOCKFILE}"
 trap 'rm -f "${RESUME_LOCKFILE}"' EXIT
 
-log "Starting Spark coder vLLM first..."
-spark_remote_sudo <<'REMOTE_EOF'
-systemctl daemon-reload
-systemctl reset-failed vllm-coder.service vllm-supergemma.service vllm-qwen.service || true
-systemctl stop vllm-qwen.service >/dev/null 2>&1 || true
-systemctl restart vllm-coder.service
-REMOTE_EOF
-
-log "Waiting for Spark coder vLLM..."
-wait_for_models_endpoint "${SPARK_CODER_V1_URL}" "Spark coder vLLM" 300
-healthcheck_tool_call "${SPARK_CODER_V1_URL}" "${CODER_MODEL_ID}" "Spark coder vLLM"
-
-log "Starting Spark SuperGemma vLLM..."
-spark_remote_sudo <<'REMOTE_EOF'
-systemctl restart vllm-supergemma.service
-REMOTE_EOF
+log "Starting Spark vLLM via docker compose..."
+ssh "${SPARK_USER}@${SPARK_HOST}" "cd ${SPARK_COMPOSE_DIR} && sudo docker compose up -d"
 
 log "Waiting for Spark SuperGemma vLLM..."
 wait_for_models_endpoint "${SPARK_SUPERGEMMA_V1_URL}" "Spark SuperGemma vLLM" 300
@@ -50,7 +36,6 @@ echo ""
 log "Spark-local serving is back."
 log "  LiteLLM mode: agent-mode"
 log "  general -> ${SUPERGEMMA_MODEL_ID}"
-log "  coder   -> ${CODER_MODEL_ID}"
 
 if ! pgrep -f "hermes" > /dev/null 2>&1; then
     warn "Hermes is not running. mba-deploy.sh starts it the first time."

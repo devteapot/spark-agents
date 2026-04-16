@@ -9,18 +9,7 @@ model_list:
       api_base: http://192.168.1.96:8001/v1
       api_key: litellm-local
 
-  - model_name: coder
-    litellm_params:
-      model: openai/qwen/qwen3-coder-next
-      api_base: http://192.168.1.96:8002/v1
-      api_key: litellm-local
-
   - model_name: general-cloud
     litellm_params:
       model: openrouter/google/gemini-2.5-flash
-      api_key: os.environ/OPENROUTER_API_KEY
-
-  - model_name: coder-cloud
-    litellm_params:
-      model: openrouter/anthropic/claude-sonnet-4-5
       api_key: os.environ/OPENROUTER_API_KEY

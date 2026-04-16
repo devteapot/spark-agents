@@ -6,12 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is **not** an application. It is a configuration + deployment repo for a two-machine agent setup:
 
-- **DGX Spark** (`carlid@slopinator-s-1.local`, IP `192.168.1.96`) - runs two `vLLM` services on CUDA 13.2 + vLLM 0.19.1 + PyTorch 2.11 with native SM121 (GB10 Blackwell) support:
-  - `vllm-supergemma.service` on `:8001` — SuperGemma4 26B MoE NVFP4 (16 GiB, `--quantization modelopt`, patched gemma4.py for MoE scale keys)
-  - `vllm-coder.service` on `:8002` — Qwen3-Coder-Next 80B/3B-A MoE NVFP4 (44 GiB, `--quantization compressed-tensors`)
-- **MacBook Air** (`sloppy@sloppy-mba.local`) - runs Hermes, OpenClaw, and a local `LiteLLM` router on `127.0.0.1:4000`
+- **DGX Spark** (`carlid@slopinator-s-1.local`, IP `192.168.1.96`) — runs a single `vLLM` service via Docker Compose on CUDA 13.2 + vLLM 0.19.1 + PyTorch 2.11 with native SM121 (GB10 Blackwell) support:
+  - SuperGemma4 26B MoE NVFP4 on `:8001` (16 GiB weights, `--quantization modelopt`, patched gemma4.py for MoE scale keys)
+- **MacBook Air** (`sloppy@sloppy-mba.local`) — runs Hermes, OpenClaw, and a local `LiteLLM` router on `127.0.0.1:4000`
 
-GPU memory budget: coder `0.55` + supergemma `0.30` = `0.85` of the GB10's 128 GiB unified memory, leaving 15% headroom.
+GPU memory budget: SuperGemma at `0.92` of the GB10's 128 GiB unified memory, with 256K context (`--max-model-len 262144`) and fp8 KV cache.
 
 The repo is cloned to both machines and scripts are run on whichever side they target. Editing configs or scripts means: commit, push, pull on the other box, then rerun `mba-deploy.sh` on the MBA so the staged runtime configs in `~/.spark-agents/` are refreshed and the live configs in `~/.hermes/` + `~/.openclaw/` are replaced.
 
@@ -21,50 +20,46 @@ All scripts live in `scripts/` and are idempotent.
 
 | Command | Where to run | What it does |
 |---|---|---|
-| `./scripts/spark-setup.sh` | Spark, once | Installs `hf` via pipx, validates Docker availability, downloads the Spark model repos into `/srv/models`, builds custom Spark-side `vLLM` container images, writes the Spark systemd units, `daemon-reload`, and enables them. |
+| `./scripts/spark-setup.sh` | Spark, once | Installs `hf` via pipx, validates Docker availability, downloads the SuperGemma model into `/srv/models`, builds the vLLM container images, migrates any legacy systemd units, and installs `docker-compose.yaml` into `/srv/spark-agents`. |
 | `./scripts/mba-deploy.sh` | MBA, after config/script edits | Stages `hermes/`, `openclaw/`, and `litellm/` configs into `~/.spark-agents`, restarts LiteLLM in the active mode, copies the live configs into `~/.hermes/` + `~/.openclaw/`, restarts Hermes/OpenClaw once, and installs `spark-*.sh` into `~/bin`. |
-| `spark-resume.sh` | MBA, daily | Starts both Spark `vLLM` services over SSH using a single remote `sudo bash -se` path, waits for `/v1/models`, runs a basic chat + tool-call health check, then switches LiteLLM into `agent-mode`. Hermes/OpenClaw stay running. |
-| `spark-pause.sh` | MBA, before reclaiming the Spark GPU | Switches LiteLLM into `offload-mode` first, then stops both Spark `vLLM` services over SSH. Hermes/OpenClaw stay running. |
-| `spark-status.sh` | MBA, anytime | Reports LiteLLM health/mode, Spark `vLLM` health, and Hermes/OpenClaw process state. Read-only. |
+| `spark-resume.sh` | MBA, daily | Starts the Spark vLLM service via `docker compose up -d` over SSH, waits for `/v1/models`, runs a chat health check, then switches LiteLLM into `agent-mode`. Hermes/OpenClaw stay running. |
+| `spark-pause.sh` | MBA, before reclaiming the Spark GPU | Switches LiteLLM into `offload-mode` first, then stops the Spark vLLM service via `docker compose down` over SSH. Hermes/OpenClaw stay running. |
+| `spark-status.sh` | MBA, anytime | Reports LiteLLM health/mode, Spark vLLM health, and Hermes/OpenClaw process state. Read-only. |
 
-There are no tests, no build, and no linter - it's shell + YAML + JSON + service templates.
+There are no tests, no build, and no linter — it's shell + YAML + JSON.
 
 ## Architecture
 
 ### The pause/resume pattern (the critical invariant)
 
-The Spark is dual-use: **agent serving** and **any other GPU compute** (benchmarks, fine-tunes, ad-hoc inference). Non-agent workloads must never compete with the agent vLLM services for GPU memory.
+The Spark is dual-use: **agent serving** and **any other GPU compute** (benchmarks, fine-tunes, ad-hoc inference). Non-agent workloads must never compete with the agent vLLM service for GPU memory.
 
 The enforcement point is the MBA-side `LiteLLM` router:
 
 - **Agent mode** (`spark-resume.sh`):
-  - start Spark `vLLM` services
+  - start Spark vLLM via `docker compose up -d`
   - wait for health
   - switch LiteLLM to `agent-mode`
   - `general` routes to Spark SuperGemma NVFP4
-  - `coder` routes to Spark Qwen3-Coder-Next NVFP4
 - **Offload mode** (`spark-pause.sh`):
   - switch LiteLLM to `offload-mode`
-  - stop Spark `vLLM` services
+  - stop Spark vLLM via `docker compose down`
   - `general` routes to hosted OpenRouter
-  - `coder` routes to hosted OpenRouter
-  - the Spark GPU is then free for any non-agent compute (benchmarks, fine-tunes, ad-hoc inference)
+  - the Spark GPU is then free for any non-agent compute
 
-Contract for future edits: pause/resume scripts should only flip LiteLLM mode and Spark-local services. Do not make them restart Hermes or OpenClaw again unless the user explicitly asks for that behavior back.
+Contract for future edits: pause/resume scripts should only flip LiteLLM mode and the Spark vLLM service. Do not make them restart Hermes or OpenClaw again unless the user explicitly asks for that behavior back.
 
 ### Model roles
 
-Two stable logical model names are exposed to both agents through LiteLLM:
+One stable logical model name is exposed to both agents through LiteLLM:
 
 - `general`
-- `coder`
 
-There are also hidden hosted aliases for explicit fallbacks:
+There is also a hidden hosted alias for explicit fallback:
 
 - `general-cloud`
-- `coder-cloud`
 
-Hermes defaults to `coder` and down-routes quick/simple turns to `general` via `smart_model_routing`. OpenClaw defaults to `general` and falls back to `coder`, then the hidden cloud aliases.
+Both Hermes and OpenClaw use `general` for all tasks. OpenClaw falls back to `general-cloud` if the primary is unavailable.
 
 ### Config deployment flow
 
@@ -79,20 +74,16 @@ Repo configs live under:
 
 ### Spark model files
 
-Spark-local model repos live under `/srv/models`:
+The Spark-local model repo lives under `/srv/models/supergemma4-nvfp4`.
 
-- `/srv/models/supergemma4-nvfp4`
-- `/srv/models/qwen3-coder-next-nvfp4`
-
-The systemd unit templates in `systemd/` render those paths into Docker-backed `vLLM` service definitions. The images are built from the repo Dockerfiles in `docker/`. If you change the download location, update both `spark-setup.sh` and the rendered service templates.
+The Docker Compose file at `spark/docker-compose.yaml` (installed to `/srv/spark-agents/docker-compose.yaml` by `spark-setup.sh`) mounts this path and runs the vLLM service. The image is built from the Dockerfiles in `docker/`.
 
 ### Docker images
 
-Three images, all built by `spark-setup.sh`:
+Two images, both built by `spark-setup.sh`:
 
 - **`spark-agents/vllm-base:cu132`** — CUDA 13.2 base with PyTorch 2.11, vLLM 0.19.1 (pre-built SM121 wheel from `eugr/spark-vllm-docker`), and FlashInfer 0.6.8. Sets `TORCH_CUDA_ARCH_LIST=12.1a` for native GB10 support.
 - **`spark-agents/vllm-supergemma:local`** — inherits base, adds torchvision (for `Gemma4VideoProcessor`) and a patched `gemma4.py` from `bg-digitalservices/Gemma-4-26B-A4B-it-NVFP4` that fixes MoE NVFP4 scale-key mapping ([vLLM #38912](https://github.com/vllm-project/vllm/issues/38912)).
-- **`spark-agents/vllm-coder:local`** — inherits base with no modifications.
 
 ### LiteLLM notes
 

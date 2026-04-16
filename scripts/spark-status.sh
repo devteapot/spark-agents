@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# spark-status.sh - Health check for LiteLLM, Spark vLLM services, and agent processes
+# spark-status.sh - Health check for LiteLLM, Spark vLLM, and agent processes
 
 set -uo pipefail
 
@@ -12,7 +12,7 @@ require_command curl
 section "Router"
 echo "  Active mode:  $(current_router_mode)"
 if litellm_is_running; then
-    echo -e "  LiteLLM:      ${GREEN}RUNNING${NC} (PID $(litellm_pid))"
+    echo -e "  LiteLLM:      ${GREEN}RUNNING${NC}"
 else
     echo -e "  LiteLLM:      ${YELLOW}STOPPED${NC}"
 fi
@@ -30,13 +30,6 @@ if MODELS_JSON="$(curl -sf "${SPARK_SUPERGEMMA_V1_URL}/models" 2>/dev/null)"; th
     print_openai_models "${MODELS_JSON}"
 else
     echo -e "  SuperGemma:   ${YELLOW}OFFLINE${NC} (${SPARK_SUPERGEMMA_V1_URL})"
-fi
-
-if MODELS_JSON="$(curl -sf "${SPARK_CODER_V1_URL}/models" 2>/dev/null)"; then
-    echo -e "  Coder:        ${GREEN}ONLINE${NC} (${SPARK_CODER_V1_URL})"
-    print_openai_models "${MODELS_JSON}"
-else
-    echo -e "  Coder:        ${YELLOW}OFFLINE${NC} (${SPARK_CODER_V1_URL})"
 fi
 
 section "Agents"
