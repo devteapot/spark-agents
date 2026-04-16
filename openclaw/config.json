@@ -5,7 +5,7 @@
     "Location after deploy: ~/.openclaw/config.json (on MBA: sloppy@sloppy-mba.local)",
     "",
     "OpenClaw talks only to the local LiteLLM router on the MBA.",
-    "Stable alias: general.",
+    "Aliases: general (thinking off), general-think (thinking on).",
     "Hidden cloud alias remains available as hosted fallback."
   ],
 
@@ -18,7 +18,14 @@
         "models": [
           {
             "id": "general",
-            "name": "LiteLLM general route",
+            "name": "LiteLLM general route (thinking off)",
+            "reasoning": false,
+            "contextWindow": 262144,
+            "maxTokens": 4096
+          },
+          {
+            "id": "general-think",
+            "name": "LiteLLM general route (thinking on)",
             "reasoning": true,
             "contextWindow": 262144,
             "maxTokens": 4096
