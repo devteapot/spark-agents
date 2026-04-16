@@ -22,7 +22,7 @@ LITELLM_LOG_FILE="${LITELLM_LOG_FILE:-/tmp/litellm.log}"
 SUPERGEMMA_MODEL_ID="AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4"
 GENERAL_CLOUD_MODEL_ID="openrouter/google/gemini-2.5-flash"
 
-SPARK_COMPOSE_DIR="/srv/spark-agents"
+SPARK_COMPOSE_DIR="/home/${SPARK_USER}/spark-agents/spark"
 
 SCRIPT_LABEL="${SCRIPT_LABEL:-spark}"
 

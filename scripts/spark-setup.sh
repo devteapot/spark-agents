@@ -131,14 +131,11 @@ for legacy_unit in vllm-supergemma.service vllm-coder.service vllm-qwen.service;
 done
 sudo systemctl daemon-reload
 
-log "Installing docker-compose.yaml into ${STATE_DIR}..."
-cp "${PROJECT_DIR}/spark/docker-compose.yaml" "${STATE_DIR}/docker-compose.yaml"
-
 echo ""
 log "Setup complete."
 log "  SuperGemma NVFP4 path: ${SUPERGEMMA_DIR}"
 log "  State/cache root:     ${STATE_DIR}"
-log "  Compose file:         ${STATE_DIR}/docker-compose.yaml"
+log "  Compose file:         ${PROJECT_DIR}/spark/docker-compose.yaml"
 log "  Base image:           ${VLLM_BASE_IMAGE}"
 log "  SuperGemma image:     ${SUPERGEMMA_IMAGE}"
 log ""
