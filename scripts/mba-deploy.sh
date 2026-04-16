@@ -127,6 +127,9 @@ gateway.setdefault("mode", "local")
 gateway.setdefault("bind", "0.0.0.0")
 gateway.setdefault("port", 18789)
 
+control_ui = gateway.setdefault("controlUi", {})
+control_ui["allowedOrigins"] = ["*"]
+
 dst.write_text(json.dumps(data, indent=2) + "\n")
 PY
 }
