@@ -20,7 +20,7 @@
             "id": "general",
             "name": "LiteLLM general route",
             "reasoning": true,
-            "contextWindow": 8192,
+            "contextWindow": 32768,
             "maxTokens": 4096
           },
           {
@@ -34,7 +34,7 @@
             "id": "general-cloud",
             "name": "LiteLLM hosted general fallback",
             "reasoning": true,
-            "contextWindow": 8192,
+            "contextWindow": 32768,
             "maxTokens": 4096
           },
           {
