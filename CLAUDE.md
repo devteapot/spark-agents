@@ -75,7 +75,7 @@ Repo configs live under:
 - `litellm/agent-mode.yaml`
 - `litellm/offload-mode.yaml`
 
-`mba-deploy.sh` stages them into `~/.spark-agents/`, then copies the live agent configs into `~/.hermes/` and `~/.openclaw/`. **Edits to `~/.hermes/cli-config.yaml` or `~/.openclaw/config.json` directly will be overwritten on the next deploy.**
+`mba-deploy.sh` stages them into `~/.spark-agents/`, then copies the live agent configs into `~/.hermes/` and `~/.openclaw/`. **Edits to `~/.hermes/config.yaml` or `~/.openclaw/config.json` directly will be overwritten on the next deploy.**
 
 ### Spark model files
 

@@ -1,45 +1,68 @@
 # Hermes Agent Configuration
-# Location after deploy: ~/.hermes/cli-config.yaml (on MBA: sloppy@sloppy-mba.local)
+# Location after deploy: ~/.hermes/config.yaml (on MBA: sloppy@sloppy-mba.local)
 #
 # Hermes talks only to the local LiteLLM router. The router owns mode switching:
 #   - agent-mode   -> Spark vLLM for `general` / `coder`
 #   - offload-mode -> hosted OpenRouter models (Spark GPU free for other compute)
-# Hidden cloud aliases stay available so Hermes can fail over without changing
-# its stable public model names.
 
-provider: custom
-model: coder
-base_url: "http://127.0.0.1:4000/v1"
-api_key: "litellm-local"
+model:
+  default: coder
+  provider: custom
+  base_url: "http://127.0.0.1:4000/v1"
+  api_key: "litellm-local"
+  context_length: 32768
 
-model_aliases:
-  general:
-    model: "general"
+delegation:
+  model: coder
+  provider: custom
+  base_url: "http://127.0.0.1:4000/v1"
+  api_key: "litellm-local"
+  max_iterations: 80
+  default_toolsets: ["terminal", "file"]
+
+auxiliary:
+  vision:
+    model: general
     provider: custom
     base_url: "http://127.0.0.1:4000/v1"
-    context_length: 8192
-    max_tokens: 4096
-
-  coder:
-    model: "coder"
+    api_key: "litellm-local"
+    timeout: 120
+  web_extract:
+    model: general
     provider: custom
     base_url: "http://127.0.0.1:4000/v1"
-    context_length: 32768
-    max_tokens: 8192
-
-  general-cloud:
-    model: "general-cloud"
+    api_key: "litellm-local"
+    timeout: 600
+  compression:
+    model: general
     provider: custom
     base_url: "http://127.0.0.1:4000/v1"
-    context_length: 8192
-    max_tokens: 4096
-
-  coder-cloud:
-    model: "coder-cloud"
+    api_key: "litellm-local"
+    timeout: 600
+  session_search:
+    model: general
     provider: custom
     base_url: "http://127.0.0.1:4000/v1"
-    context_length: 32768
-    max_tokens: 8192
+    api_key: "litellm-local"
+  flush_memories:
+    model: general
+    provider: custom
+    base_url: "http://127.0.0.1:4000/v1"
+    api_key: "litellm-local"
+  approval:
+    model: general
+    provider: custom
+    base_url: "http://127.0.0.1:4000/v1"
+    api_key: "litellm-local"
+
+compression:
+  enabled: true
+  threshold: 0.50
+  target_ratio: 0.20
+  protect_last_n: 20
+  summary_model: general
+  summary_provider: custom
+  summary_base_url: "http://127.0.0.1:4000/v1"
 
 smart_model_routing:
   enabled: true
@@ -47,33 +70,53 @@ smart_model_routing:
   max_simple_words: 35
   cheap_model:
     provider: custom
-    model: "general"
+    model: general
     base_url: "http://127.0.0.1:4000/v1"
     api_key: "litellm-local"
 
 fallback_model:
   provider: custom
-  model: "general-cloud"
+  model: general-cloud
   base_url: "http://127.0.0.1:4000/v1"
   api_key: "litellm-local"
+
+agent:
+  max_turns: 200
+  reasoning_effort: "high"
+  tool_use_enforcement: false
 
 autonomous: true
 
 skills:
   auto_create: true
-  min_tool_calls: 5
+  auto_improve: true
 
 memory:
-  enabled: true
-  provider: local
+  memory_enabled: true
+  user_profile_enabled: true
+  memory_char_limit: 2200
+  user_char_limit: 1375
 
 tools:
   enabled: true
 
-# gateway:
-#   telegram:
-#     token: "YOUR_TELEGRAM_BOT_TOKEN"
-#   discord:
-#     token: "YOUR_DISCORD_BOT_TOKEN"
-#   slack:
-#     token: "YOUR_SLACK_BOT_TOKEN"
+terminal:
+  backend: local
+  timeout: 300
+
+file_read_max_chars: 100000
+
+checkpoints:
+  enabled: true
+  max_snapshots: 50
+
+approvals:
+  mode: "off"
+
+display:
+  tool_progress: all
+  bell_on_complete: true
+  streaming: false
+  show_cost: false
+
+timezone: "Europe/Zurich"

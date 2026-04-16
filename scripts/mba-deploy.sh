@@ -89,7 +89,7 @@ start_process_if_needed() {
 }
 
 hermes_gateway_configured() {
-    python3 - "${HOME}/.hermes/cli-config.yaml" <<'PY'
+    python3 - "${HOME}/.hermes/config.yaml" <<'PY'
 import sys
 from pathlib import Path
 
@@ -243,7 +243,7 @@ echo ""
 section "Deployment Complete"
 echo "  LiteLLM endpoint:  ${LITELLM_V1_URL}"
 echo "  Router mode:       ${CURRENT_MODE}"
-echo "  Hermes config:     ${HOME}/.hermes/cli-config.yaml"
+echo "  Hermes config:     ${HOME}/.hermes/config.yaml"
 echo "  OpenClaw config:   ${HOME}/.openclaw/config.json"
 echo "  OpenClaw gateway:  http://0.0.0.0:18789/"
 echo "  LiteLLM configs:   ${LITELLM_RUNTIME_DIR}"
