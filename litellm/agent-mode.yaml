@@ -2,13 +2,13 @@ model_list:
   - model_name: general
     litellm_params:
       model: openai/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4
-      api_base: http://slopinator-s-1.local:8001/v1
+      api_base: http://192.168.1.96:8001/v1
       api_key: litellm-local
 
   - model_name: coder
     litellm_params:
       model: openai/qwen/qwen3-coder-next
-      api_base: http://slopinator-s-1.local:8002/v1
+      api_base: http://192.168.1.96:8002/v1
       api_key: litellm-local
 
   - model_name: general-cloud
