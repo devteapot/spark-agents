@@ -1,7 +1,7 @@
 services:
-  vllm-supergemma:
-    image: spark-agents/vllm-supergemma:local
-    container_name: spark-vllm-supergemma
+  vllm-qwen:
+    image: spark-agents/vllm-qwen:local
+    container_name: spark-vllm-qwen
     restart: unless-stopped
     network_mode: host
     ipc: host
@@ -19,29 +19,24 @@ services:
     environment:
       - HF_HOME=/root/.cache/huggingface
       - HUGGINGFACE_HUB_CACHE=/root/.cache/huggingface/hub
-      - VLLM_USE_FLASHINFER_MOE_FP4=0
       - VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
     volumes:
-      - /srv/models/supergemma4-nvfp4:/models/supergemma:ro
-      - /srv/spark-agents/cache/supergemma:/root/.cache
+      - /srv/models/qwen3.6-35b-a3b-fp8:/models/qwen:ro
+      - /srv/spark-agents/cache/qwen:/root/.cache
     command:
       - vllm
       - serve
-      - /models/supergemma
+      - /models/qwen
       - --host
       - "0.0.0.0"
       - --port
       - "8001"
       - --served-model-name
-      - AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4
-      - --quantization
-      - modelopt
+      - Qwen/Qwen3.6-35B-A3B-FP8
       - --dtype
       - auto
       - --kv-cache-dtype
       - fp8
-      - --moe-backend
-      - marlin
       - --tensor-parallel-size
       - "1"
       - --max-model-len
@@ -55,9 +50,9 @@ services:
       - --enable-prefix-caching
       - --enable-auto-tool-choice
       - --tool-call-parser
-      - gemma4
+      - qwen25
       - --reasoning-parser
-      - gemma4
+      - deepseek_r1
     healthcheck:
       test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8001/v1/models\", timeout=3)'"]
       interval: 30s

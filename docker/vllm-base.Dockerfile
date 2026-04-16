@@ -2,7 +2,7 @@ FROM nvidia/cuda:13.2.0-cudnn-devel-ubuntu24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG TORCH_CUDA_INDEX_URL=https://download.pytorch.org/whl/cu130
-ARG VLLM_WHEEL_URL=https://github.com/eugr/spark-vllm-docker/releases/download/prebuilt-vllm-current/vllm-0.19.1rc1.dev322%2Bg03f8d3a54.d20260415.cu132-cp312-cp312-linux_aarch64.whl
+ARG VLLM_WHEEL_URL=https://github.com/eugr/spark-vllm-docker/releases/download/prebuilt-vllm-current/vllm-0.19.1rc1.dev337%2Bg17d87168d.d20260416.cu132-cp312-cp312-linux_aarch64.whl
 ARG FLASHINFER_CUBIN_URL=https://github.com/eugr/spark-vllm-docker/releases/download/prebuilt-flashinfer-current/flashinfer_cubin-0.6.8-py3-none-any.whl
 ARG FLASHINFER_JIT_URL=https://github.com/eugr/spark-vllm-docker/releases/download/prebuilt-flashinfer-current/flashinfer_jit_cache-0.6.8-cp39-abi3-manylinux_2_28_aarch64.whl
 ARG FLASHINFER_PYTHON_URL=https://github.com/eugr/spark-vllm-docker/releases/download/prebuilt-flashinfer-current/flashinfer_python-0.6.8-py3-none-any.whl

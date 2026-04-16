@@ -26,6 +26,10 @@ MODELOPT_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abl
 SERVING_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/serving_chat_patched.py"
 VLLM_BASE_IMAGE="spark-agents/vllm-base:cu132"
 SUPERGEMMA_IMAGE="spark-agents/vllm-supergemma:local"
+QWEN_DIR="${MODEL_DIR}/qwen3.6-35b-a3b-fp8"
+QWEN_CACHE_DIR="${STATE_DIR}/cache/qwen"
+QWEN_MODEL_REPO="Qwen/Qwen3.6-35B-A3B-FP8"
+QWEN_IMAGE="spark-agents/vllm-qwen:local"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -98,7 +102,7 @@ if [ ! -d "${STATE_DIR}" ]; then
     sudo chmod 755 "${STATE_DIR}"
 fi
 
-sudo mkdir -p "${SUPERGEMMA_DIR}" "${SUPERGEMMA_CACHE_DIR}"
+sudo mkdir -p "${SUPERGEMMA_DIR}" "${SUPERGEMMA_CACHE_DIR}" "${QWEN_DIR}" "${QWEN_CACHE_DIR}"
 sudo chown -R "$(id -un):$(id -gn)" "${MODEL_DIR}" "${STATE_DIR}"
 
 if [ -f "${SUPERGEMMA_DIR}/config.json" ]; then
@@ -108,6 +112,15 @@ else
     hf download \
         "${SUPERGEMMA_MODEL_REPO}" \
         --local-dir "${SUPERGEMMA_DIR}"
+fi
+
+if [ -f "${QWEN_DIR}/config.json" ]; then
+    log "${QWEN_MODEL_REPO} already present in ${QWEN_DIR}."
+else
+    log "Downloading ${QWEN_MODEL_REPO} into ${QWEN_DIR}..."
+    hf download \
+        "${QWEN_MODEL_REPO}" \
+        --local-dir "${QWEN_DIR}"
 fi
 
 build_image \
@@ -120,6 +133,11 @@ build_image \
     --build-arg "BASE_IMAGE=${VLLM_BASE_IMAGE}" \
     --build-arg "MODELOPT_PATCH_URL=${MODELOPT_PATCH_URL}" \
     --build-arg "SERVING_PATCH_URL=${SERVING_PATCH_URL}"
+
+build_image \
+    "${QWEN_IMAGE}" \
+    "docker/vllm-qwen.Dockerfile" \
+    --build-arg "BASE_IMAGE=${VLLM_BASE_IMAGE}"
 
 # Migrate from legacy systemd units
 for legacy_unit in vllm-supergemma.service vllm-coder.service vllm-qwen.service; do
@@ -134,10 +152,12 @@ sudo systemctl daemon-reload
 echo ""
 log "Setup complete."
 log "  SuperGemma NVFP4 path: ${SUPERGEMMA_DIR}"
+log "  Qwen3.6 FP8 path:    ${QWEN_DIR}"
 log "  State/cache root:     ${STATE_DIR}"
 log "  Compose file:         ${PROJECT_DIR}/spark/docker-compose.yaml"
 log "  Base image:           ${VLLM_BASE_IMAGE}"
 log "  SuperGemma image:     ${SUPERGEMMA_IMAGE}"
+log "  Qwen image:           ${QWEN_IMAGE}"
 log ""
 log "Next steps:"
 log "  1. On MBA, run:    ./scripts/mba-deploy.sh"

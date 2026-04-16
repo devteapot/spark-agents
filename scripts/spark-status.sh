@@ -25,11 +25,11 @@ else
 fi
 
 section "Spark vLLM"
-if MODELS_JSON="$(curl -sf "${SPARK_SUPERGEMMA_V1_URL}/models" 2>/dev/null)"; then
-    echo -e "  SuperGemma:   ${GREEN}ONLINE${NC} (${SPARK_SUPERGEMMA_V1_URL})"
+if MODELS_JSON="$(curl -sf "${SPARK_QWEN_V1_URL}/models" 2>/dev/null)"; then
+    echo -e "  Qwen:         ${GREEN}ONLINE${NC} (${SPARK_QWEN_V1_URL})"
     print_openai_models "${MODELS_JSON}"
 else
-    echo -e "  SuperGemma:   ${YELLOW}OFFLINE${NC} (${SPARK_SUPERGEMMA_V1_URL})"
+    echo -e "  Qwen:         ${YELLOW}OFFLINE${NC} (${SPARK_QWEN_V1_URL})"
 fi
 
 section "Agents"
