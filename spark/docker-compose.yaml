@@ -47,7 +47,7 @@ services:
       - --max-model-len
       - "262144"
       - --max-num-seqs
-      - "4"
+      - "8"
       - --gpu-memory-utilization
       - "0.92"
       - --trust-remote-code
