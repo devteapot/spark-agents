@@ -10,7 +10,7 @@ model:
   provider: custom
   base_url: "http://127.0.0.1:4000/v1"
   api_key: "litellm-local"
-  context_length: 131072
+  context_length: 65536
 
 delegation:
   model: coder
