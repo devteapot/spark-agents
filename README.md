@@ -2,8 +2,8 @@
 
 Two-machine agent infrastructure with:
 
-- Spark running local `vLLM` model servers
-- MBA running Hermes, OpenClaw, and a local `LiteLLM` router
+- **DGX Spark** (GB10, 128 GiB unified memory) running two local `vLLM` model servers on CUDA 13.2 + vLLM 0.19.1 + PyTorch 2.11 with native SM121 support
+- **MacBook Air** running Hermes, OpenClaw, and a local `LiteLLM` router
 
 ## Architecture
 
@@ -14,8 +14,8 @@ MBA (sloppy@sloppy-mba.local)
   OpenClaw /
 
 LiteLLM routes:
-  agent-mode   -> Spark vLLM SuperGemma (8001)
-               -> Spark vLLM coder (8002)
+  agent-mode   -> Spark vLLM SuperGemma :8001 (general)
+               -> Spark vLLM Qwen3-Coder-Next :8002 (coder)
   offload-mode -> OpenRouter hosted models (Spark GPU free for other compute)
 ```
 
@@ -31,10 +31,12 @@ Hidden cloud aliases stay available behind the router for hosted escape hatches:
 
 ## Models
 
-Spark-local models:
+Spark-local models (co-resident, GPU budget 0.85):
 
-- `AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4`
-- `GadflyII/Qwen3-Coder-Next-NVFP4`
+| Role | Model | HF Repo | VRAM | Quant |
+|---|---|---|---|---|
+| `general` | SuperGemma4 26B MoE | `AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4` | 16 GiB | NVFP4 (modelopt) |
+| `coder` | Qwen3-Coder-Next 80B/3B-A MoE | `GadflyII/Qwen3-Coder-Next-NVFP4` | 44 GiB | NVFP4 (compressed-tensors) |
 
 Hosted offload-mode models:
 

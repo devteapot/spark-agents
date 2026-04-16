@@ -6,10 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is **not** an application. It is a configuration + deployment repo for a two-machine agent setup:
 
-- **DGX Spark** (`carlid@slopinator-s-1.local`) - runs two `vLLM` services:
-  - `vllm-supergemma.service` on `:8001`
-  - `vllm-coder.service` on `:8002`
+- **DGX Spark** (`carlid@slopinator-s-1.local`, IP `192.168.1.96`) - runs two `vLLM` services on CUDA 13.2 + vLLM 0.19.1 + PyTorch 2.11 with native SM121 (GB10 Blackwell) support:
+  - `vllm-supergemma.service` on `:8001` — SuperGemma4 26B MoE NVFP4 (16 GiB, `--quantization modelopt`, patched gemma4.py for MoE scale keys)
+  - `vllm-coder.service` on `:8002` — Qwen3-Coder-Next 80B/3B-A MoE NVFP4 (44 GiB, `--quantization compressed-tensors`)
 - **MacBook Air** (`sloppy@sloppy-mba.local`) - runs Hermes, OpenClaw, and a local `LiteLLM` router on `127.0.0.1:4000`
+
+GPU memory budget: coder `0.55` + supergemma `0.30` = `0.85` of the GB10's 128 GiB unified memory, leaving 15% headroom.
 
 The repo is cloned to both machines and scripts are run on whichever side they target. Editing configs or scripts means: commit, push, pull on the other box, then rerun `mba-deploy.sh` on the MBA so the staged runtime configs in `~/.spark-agents/` are refreshed and the live configs in `~/.hermes/` + `~/.openclaw/` are replaced.
 
@@ -83,3 +85,16 @@ Spark-local model repos live under `/srv/models`:
 - `/srv/models/qwen3-coder-next-nvfp4`
 
 The systemd unit templates in `systemd/` render those paths into Docker-backed `vLLM` service definitions. The images are built from the repo Dockerfiles in `docker/`. If you change the download location, update both `spark-setup.sh` and the rendered service templates.
+
+### Docker images
+
+Three images, all built by `spark-setup.sh`:
+
+- **`spark-agents/vllm-base:cu132`** — CUDA 13.2 base with PyTorch 2.11, vLLM 0.19.1 (pre-built SM121 wheel from `eugr/spark-vllm-docker`), and FlashInfer 0.6.8. Sets `TORCH_CUDA_ARCH_LIST=12.1a` for native GB10 support.
+- **`spark-agents/vllm-supergemma:local`** — inherits base, adds torchvision (for `Gemma4VideoProcessor`) and a patched `gemma4.py` from `bg-digitalservices/Gemma-4-26B-A4B-it-NVFP4` that fixes MoE NVFP4 scale-key mapping ([vLLM #38912](https://github.com/vllm-project/vllm/issues/38912)).
+- **`spark-agents/vllm-coder:local`** — inherits base with no modifications.
+
+### LiteLLM notes
+
+- `litellm_settings.ssl_verify` must be `~` (YAML null / Python None), **not** `false`. In LiteLLM's aiohttp transport, `ssl=False` means "use SSL but skip cert check" which breaks plain HTTP connections. `None` means "default behavior" (no SSL for `http://`).
+- The Spark `api_base` URLs use the static IP (`192.168.1.96`) rather than mDNS (`slopinator-s-1.local`) because Python's asyncio resolver does not support `.local` mDNS on macOS.
