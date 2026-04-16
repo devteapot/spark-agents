@@ -10,5 +10,6 @@ ENV VLLM_NVFP4_GEMM_BACKEND=marlin
 ENV TORCH_MATMUL_PRECISION=high
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-RUN VLLM_DIR="$(python3 -c 'import vllm; print(vllm.__path__[0])')" && \
+RUN pip install --index-url https://download.pytorch.org/whl/cu130 torchvision && \
+    VLLM_DIR="$(python3 -c 'import vllm; print(vllm.__path__[0])')" && \
     curl -fsSL "${GEMMA4_PATCH_URL}" -o "${VLLM_DIR}/model_executor/models/gemma4.py"
