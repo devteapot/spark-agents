@@ -23,6 +23,7 @@ HERMES_REPO_CONFIG="${PROJECT_DIR}/hermes/cli-config.yaml"
 OPENCLAW_REPO_CONFIG="${PROJECT_DIR}/openclaw/config.json"
 LITELLM_AGENT_REPO_CONFIG="${PROJECT_DIR}/litellm/agent-mode.yaml"
 LITELLM_OFFLOAD_REPO_CONFIG="${PROJECT_DIR}/litellm/offload-mode.yaml"
+LITELLM_COMPOSE_REPO="${PROJECT_DIR}/litellm/docker-compose.yaml"
 
 RUNTIME_HERMES_DIR="${SPARK_AGENTS_HOME}/hermes"
 RUNTIME_OPENCLAW_DIR="${SPARK_AGENTS_HOME}/openclaw"
@@ -140,7 +141,7 @@ if [ ! -f "${HERMES_REPO_CONFIG}" ] || [ ! -f "${OPENCLAW_REPO_CONFIG}" ] || [ !
 fi
 
 require_command curl
-require_command hermes
+require_command docker
 require_command python3
 ensure_npm_global_bin_on_path
 ensure_runtime_dirs
@@ -152,6 +153,7 @@ cp "${HERMES_REPO_CONFIG}" "${RUNTIME_HERMES_DIR}/cli-config.yaml"
 cp "${OPENCLAW_REPO_CONFIG}" "${RUNTIME_OPENCLAW_DIR}/config.json"
 cp "${LITELLM_AGENT_REPO_CONFIG}" "${LITELLM_AGENT_CONFIG}"
 cp "${LITELLM_OFFLOAD_REPO_CONFIG}" "${LITELLM_OFFLOAD_CONFIG}"
+cp "${LITELLM_COMPOSE_REPO}" "${LITELLM_RUNTIME_DIR}/docker-compose.yaml"
 
 if [ -f "${LITELLM_RUNTIME_DIR}/benchmark-mode.yaml" ]; then
     rm -f "${LITELLM_RUNTIME_DIR}/benchmark-mode.yaml"

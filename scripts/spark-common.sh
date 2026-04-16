@@ -109,65 +109,53 @@ require_openrouter_api_key() {
 }
 
 ensure_litellm_installed() {
-    if command -v litellm > /dev/null 2>&1; then
+    if command -v docker > /dev/null 2>&1; then
         return 0
     fi
 
-    if command -v uv > /dev/null 2>&1; then
-        log "Installing LiteLLM via uv..."
-        uv tool install 'litellm[proxy]'
-    elif command -v pipx > /dev/null 2>&1; then
-        log "Installing LiteLLM via pipx..."
-        pipx install 'litellm[proxy]'
-    else
-        err "LiteLLM is not installed and neither uv nor pipx is available."
-        return 1
-    fi
-
-    command -v litellm > /dev/null 2>&1 || {
-        err "LiteLLM installation finished but 'litellm' is still not on PATH."
-        return 1
-    }
+    err "Docker is not installed. Install Docker Desktop and try again."
+    return 1
 }
 
-litellm_pid() {
-    [ -f "${LITELLM_PID_FILE}" ] || return 1
-    cat "${LITELLM_PID_FILE}"
+LITELLM_COMPOSE_FILE="${LITELLM_COMPOSE_FILE:-}"
+
+_litellm_compose_file() {
+    if [ -n "${LITELLM_COMPOSE_FILE}" ]; then
+        printf '%s\n' "${LITELLM_COMPOSE_FILE}"
+        return 0
+    fi
+
+    local candidates=(
+        "${SPARK_AGENTS_HOME}/litellm/docker-compose.yaml"
+        "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)/litellm/docker-compose.yaml"
+    )
+    for f in "${candidates[@]}"; do
+        if [ -f "$f" ]; then
+            printf '%s\n' "$f"
+            return 0
+        fi
+    done
+
+    err "Cannot find litellm/docker-compose.yaml"
+    return 1
 }
 
 litellm_is_running() {
-    local pid
-    pid="$(litellm_pid 2>/dev/null)" || return 1
-    kill -0 "${pid}" 2>/dev/null
+    docker container inspect spark-litellm > /dev/null 2>&1 && \
+        [ "$(docker container inspect -f '{{.State.Running}}' spark-litellm 2>/dev/null)" = "true" ]
 }
 
 stop_litellm() {
-    local pid
-
-    pid="$(litellm_pid 2>/dev/null)" || {
-        rm -f "${LITELLM_PID_FILE}"
-        return 0
-    }
-
-    if ! kill -0 "${pid}" 2>/dev/null; then
-        rm -f "${LITELLM_PID_FILE}"
+    if ! docker container inspect spark-litellm > /dev/null 2>&1; then
         return 0
     fi
 
-    log "Stopping LiteLLM (PID ${pid})..."
-    kill "${pid}" 2>/dev/null || true
+    log "Stopping LiteLLM container..."
+    docker stop spark-litellm > /dev/null 2>&1 || true
+    docker rm spark-litellm > /dev/null 2>&1 || true
 
-    local i
-    for i in $(seq 1 15); do
-        if ! kill -0 "${pid}" 2>/dev/null; then
-            rm -f "${LITELLM_PID_FILE}"
-            return 0
-        fi
-        sleep 1
-    done
-
-    warn "LiteLLM did not stop after 15s; sending SIGKILL."
-    kill -9 "${pid}" 2>/dev/null || true
+    # Clean up any legacy bare-process litellm
+    pkill -9 -f "litellm --config" 2>/dev/null || true
     rm -f "${LITELLM_PID_FILE}"
 }
 
@@ -286,9 +274,12 @@ restart_litellm() {
     local mode="$1"
     local source_config
     local openrouter_key
+    local compose_file
 
     ensure_runtime_dirs
     ensure_litellm_installed
+
+    compose_file="$(_litellm_compose_file)" || return 1
 
     source_config="$(router_mode_config_path "${mode}")"
     [ -f "${source_config}" ] || {
@@ -313,17 +304,13 @@ restart_litellm() {
     stop_litellm
 
     log "Starting LiteLLM in ${mode}..."
-    nohup env OPENROUTER_API_KEY="${openrouter_key}" \
-        litellm \
-        --config "${LITELLM_ACTIVE_CONFIG}" \
-        --host 127.0.0.1 \
-        --port 4000 \
-        > "${LITELLM_LOG_FILE}" 2>&1 &
-    echo $! > "${LITELLM_PID_FILE}"
+    LITELLM_CONFIG_PATH="${LITELLM_RUNTIME_DIR}" \
+    OPENROUTER_API_KEY="${openrouter_key}" \
+        docker compose -f "${compose_file}" up -d 2>&1 | grep -v "^$" || true
 
     wait_for_models_endpoint "${LITELLM_V1_URL}" "LiteLLM" 30 || {
-        err "LiteLLM log tail:"
-        tail -n 30 "${LITELLM_LOG_FILE}" 2>/dev/null || true
+        err "LiteLLM container logs:"
+        docker logs spark-litellm --tail 30 2>&1 || true
         return 1
     }
 }
