@@ -24,13 +24,11 @@ SUPERGEMMA_CACHE_DIR="${STATE_DIR}/cache/supergemma"
 CODER_CACHE_DIR="${STATE_DIR}/cache/coder"
 SYSTEMD_DIR="/etc/systemd/system"
 DOCKER_BIN="$(command -v docker || true)"
-TORCH_CUDA_INDEX_URL="https://download.pytorch.org/whl/cu130"
-VLLM_CUDA_WHEEL_URL="https://wheels.vllm.ai/2a69949bdadf0e8942b7a1619b229cb475beef20/vllm-0.19.0%2Bcu130-cp38-abi3-manylinux_2_35_aarch64.whl"
 SUPERGEMMA_MODEL_REPO="AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4"
 CODER_MODEL_REPO="GadflyII/Qwen3-Coder-Next-NVFP4"
 MODELOPT_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/modelopt_patched.py"
 SERVING_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/serving_chat_patched.py"
-VLLM_BASE_IMAGE="spark-agents/vllm-base:cu130"
+VLLM_BASE_IMAGE="spark-agents/vllm-base:cu132"
 SUPERGEMMA_IMAGE="spark-agents/vllm-supergemma:local"
 CODER_IMAGE="spark-agents/vllm-coder:local"
 
@@ -165,9 +163,7 @@ fi
 
 build_image \
     "${VLLM_BASE_IMAGE}" \
-    "docker/vllm-base.Dockerfile" \
-    --build-arg "TORCH_CUDA_INDEX_URL=${TORCH_CUDA_INDEX_URL}" \
-    --build-arg "VLLM_CUDA_WHEEL_URL=${VLLM_CUDA_WHEEL_URL}"
+    "docker/vllm-base.Dockerfile"
 
 build_image \
     "${SUPERGEMMA_IMAGE}" \

@@ -1,2 +1,2 @@
-ARG BASE_IMAGE=spark-agents/vllm-base:cu130
+ARG BASE_IMAGE=spark-agents/vllm-base:cu132
 FROM ${BASE_IMAGE}

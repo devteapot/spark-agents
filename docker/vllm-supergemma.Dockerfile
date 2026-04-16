@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=spark-agents/vllm-base:cu130
+ARG BASE_IMAGE=spark-agents/vllm-base:cu132
 FROM ${BASE_IMAGE}
 
 ARG MODELOPT_PATCH_URL=https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/modelopt_patched.py
