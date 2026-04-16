@@ -15,13 +15,13 @@ SPARK_AGENTS_HOME="${HOME}/.spark-agents"
 LITELLM_RUNTIME_DIR="${SPARK_AGENTS_HOME}/litellm"
 LITELLM_ACTIVE_CONFIG="${LITELLM_RUNTIME_DIR}/config.yaml"
 LITELLM_AGENT_CONFIG="${LITELLM_RUNTIME_DIR}/agent-mode.yaml"
-LITELLM_BENCHMARK_CONFIG="${LITELLM_RUNTIME_DIR}/benchmark-mode.yaml"
+LITELLM_OFFLOAD_CONFIG="${LITELLM_RUNTIME_DIR}/offload-mode.yaml"
 LITELLM_MODE_FILE="${LITELLM_RUNTIME_DIR}/current-mode"
 LITELLM_PID_FILE="${LITELLM_RUNTIME_DIR}/litellm.pid"
 LITELLM_LOG_FILE="${LITELLM_LOG_FILE:-/tmp/litellm.log}"
 
 SUPERGEMMA_MODEL_ID="AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4"
-CODER_MODEL_ID="nvidia/nemotron-3-super"
+CODER_MODEL_ID="qwen/qwen3-coder-next"
 GENERAL_CLOUD_MODEL_ID="openrouter/google/gemini-2.5-flash"
 CODER_CLOUD_MODEL_ID="openrouter/anthropic/claude-sonnet-4-5"
 
@@ -274,7 +274,7 @@ router_mode_config_path() {
 
     case "${mode}" in
         agent-mode) printf '%s\n' "${LITELLM_AGENT_CONFIG}" ;;
-        benchmark-mode) printf '%s\n' "${LITELLM_BENCHMARK_CONFIG}" ;;
+        offload-mode|benchmark-mode) printf '%s\n' "${LITELLM_OFFLOAD_CONFIG}" ;;
         *)
             err "Unknown LiteLLM mode: ${mode}"
             return 1

@@ -19,7 +19,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODEL_DIR="/srv/models"
 STATE_DIR="/srv/spark-agents"
 SUPERGEMMA_DIR="${MODEL_DIR}/supergemma4-nvfp4"
-CODER_DIR="${MODEL_DIR}/nemotron-super-nvfp4"
+CODER_DIR="${MODEL_DIR}/qwen3-coder-next-nvfp4"
 SUPERGEMMA_CACHE_DIR="${STATE_DIR}/cache/supergemma"
 CODER_CACHE_DIR="${STATE_DIR}/cache/coder"
 SYSTEMD_DIR="/etc/systemd/system"
@@ -27,7 +27,7 @@ DOCKER_BIN="$(command -v docker || true)"
 TORCH_CUDA_INDEX_URL="https://download.pytorch.org/whl/cu130"
 VLLM_CUDA_WHEEL_URL="https://wheels.vllm.ai/2a69949bdadf0e8942b7a1619b229cb475beef20/vllm-0.19.0%2Bcu130-cp38-abi3-manylinux_2_35_aarch64.whl"
 SUPERGEMMA_MODEL_REPO="AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4"
-CODER_MODEL_REPO="nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4"
+CODER_MODEL_REPO="GadflyII/Qwen3-Coder-Next-NVFP4"
 MODELOPT_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/modelopt_patched.py"
 SERVING_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/serving_chat_patched.py"
 VLLM_BASE_IMAGE="spark-agents/vllm-base:cu130"
@@ -145,19 +145,22 @@ fi
 sudo mkdir -p "${SUPERGEMMA_DIR}" "${CODER_DIR}" "${SUPERGEMMA_CACHE_DIR}" "${CODER_CACHE_DIR}"
 sudo chown -R "$(id -un):$(id -gn)" "${MODEL_DIR}" "${STATE_DIR}"
 
-log "Downloading ${SUPERGEMMA_MODEL_REPO} into ${SUPERGEMMA_DIR}..."
-hf download \
-    "${SUPERGEMMA_MODEL_REPO}" \
-    --local-dir "${SUPERGEMMA_DIR}"
+if [ -f "${SUPERGEMMA_DIR}/config.json" ]; then
+    log "${SUPERGEMMA_MODEL_REPO} already present in ${SUPERGEMMA_DIR}."
+else
+    log "Downloading ${SUPERGEMMA_MODEL_REPO} into ${SUPERGEMMA_DIR}..."
+    hf download \
+        "${SUPERGEMMA_MODEL_REPO}" \
+        --local-dir "${SUPERGEMMA_DIR}"
+fi
 
-log "Downloading ${CODER_MODEL_REPO} into ${CODER_DIR}..."
-hf download \
-    "${CODER_MODEL_REPO}" \
-    --local-dir "${CODER_DIR}"
-
-if [ ! -f "${CODER_DIR}/super_v3_reasoning_parser.py" ]; then
-    err "Expected reasoning parser not found at ${CODER_DIR}/super_v3_reasoning_parser.py after download."
-    exit 1
+if [ -f "${CODER_DIR}/config.json" ]; then
+    log "${CODER_MODEL_REPO} already present in ${CODER_DIR}."
+else
+    log "Downloading ${CODER_MODEL_REPO} into ${CODER_DIR}..."
+    hf download \
+        "${CODER_MODEL_REPO}" \
+        --local-dir "${CODER_DIR}"
 fi
 
 build_image \
@@ -195,7 +198,7 @@ sudo systemctl enable vllm-supergemma.service vllm-coder.service
 echo ""
 log "Setup complete."
 log "  SuperGemma NVFP4 path: ${SUPERGEMMA_DIR}"
-log "  Nemotron coder path:  ${CODER_DIR}"
+log "  Qwen3-Coder-Next path:${CODER_DIR}"
 log "  State/cache root:     ${STATE_DIR}"
 log "  Base image:           ${VLLM_BASE_IMAGE}"
 log "  SuperGemma image:     ${SUPERGEMMA_IMAGE}"

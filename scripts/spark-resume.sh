@@ -14,15 +14,19 @@ require_command python3
 ensure_runtime_dirs
 ensure_litellm_installed
 
+RESUME_LOCKFILE="${SPARK_AGENTS_HOME}/spark-resume.pid"
+if [ -f "${RESUME_LOCKFILE}" ] && kill -0 "$(cat "${RESUME_LOCKFILE}" 2>/dev/null)" 2>/dev/null; then
+    err "Another spark-resume is already running (PID $(cat "${RESUME_LOCKFILE}")). Refusing to re-enter; this prevents SIGKILLing an in-flight model load."
+    exit 1
+fi
+echo "$$" > "${RESUME_LOCKFILE}"
+trap 'rm -f "${RESUME_LOCKFILE}"' EXIT
+
 log "Starting Spark coder vLLM first..."
 spark_remote_sudo <<'REMOTE_EOF'
 systemctl daemon-reload
 systemctl reset-failed vllm-coder.service vllm-supergemma.service vllm-qwen.service || true
 systemctl stop vllm-qwen.service >/dev/null 2>&1 || true
-pkill -f '/opt/spark-agents-vllm/bin/vllm serve /srv/models/qwen3-coder-next-fp8' || true
-pkill -f '/opt/spark-agents-vllm/bin/vllm serve /srv/models/nemotron-super-nvfp4' || true
-pkill -f '/opt/spark-agents-vllm/bin/vllm serve /srv/models/supergemma4-nvfp4' || true
-docker rm -f spark-vllm-qwen spark-vllm-coder >/dev/null 2>&1 || true
 systemctl restart vllm-coder.service
 REMOTE_EOF
 

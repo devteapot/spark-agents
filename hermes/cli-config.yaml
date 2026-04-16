@@ -2,8 +2,8 @@
 # Location after deploy: ~/.hermes/cli-config.yaml (on MBA: sloppy@sloppy-mba.local)
 #
 # Hermes talks only to the local LiteLLM router. The router owns mode switching:
-#   - agent-mode     -> Spark vLLM for `general` / `coder`
-#   - benchmark-mode -> hosted OpenRouter models
+#   - agent-mode   -> Spark vLLM for `general` / `coder`
+#   - offload-mode -> hosted OpenRouter models (Spark GPU free for other compute)
 # Hidden cloud aliases stay available so Hermes can fail over without changing
 # its stable public model names.
 

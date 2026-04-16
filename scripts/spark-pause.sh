@@ -13,8 +13,8 @@ ensure_runtime_dirs
 ensure_litellm_installed
 require_openrouter_api_key > /dev/null
 
-log "Switching LiteLLM to benchmark-mode first..."
-restart_litellm "benchmark-mode"
+log "Switching LiteLLM to offload-mode first..."
+restart_litellm "offload-mode"
 
 log "Stopping Spark vLLM services..."
 spark_remote_sudo <<'REMOTE_EOF'
@@ -23,8 +23,8 @@ systemctl stop vllm-qwen.service >/dev/null 2>&1 || true
 REMOTE_EOF
 
 echo ""
-log "Benchmark mode is active."
-log "  LiteLLM mode: benchmark-mode"
+log "Offload mode is active. Spark GPU is free for non-agent compute."
+log "  LiteLLM mode: offload-mode"
 log "  general -> ${GENERAL_CLOUD_MODEL_ID}"
 log "  coder   -> ${CODER_CLOUD_MODEL_ID}"
 log "  Hermes and OpenClaw were left running."

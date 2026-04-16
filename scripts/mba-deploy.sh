@@ -22,12 +22,12 @@ source "${SCRIPT_DIR}/spark-common.sh"
 HERMES_REPO_CONFIG="${PROJECT_DIR}/hermes/cli-config.yaml"
 OPENCLAW_REPO_CONFIG="${PROJECT_DIR}/openclaw/config.json"
 LITELLM_AGENT_REPO_CONFIG="${PROJECT_DIR}/litellm/agent-mode.yaml"
-LITELLM_BENCHMARK_REPO_CONFIG="${PROJECT_DIR}/litellm/benchmark-mode.yaml"
+LITELLM_OFFLOAD_REPO_CONFIG="${PROJECT_DIR}/litellm/offload-mode.yaml"
 
 RUNTIME_HERMES_DIR="${SPARK_AGENTS_HOME}/hermes"
 RUNTIME_OPENCLAW_DIR="${SPARK_AGENTS_HOME}/openclaw"
 
-DEFAULT_MODE="benchmark-mode"
+DEFAULT_MODE="offload-mode"
 
 ensure_npm_global_bin_on_path() {
     local prefix=""
@@ -131,7 +131,7 @@ dst.write_text(json.dumps(data, indent=2) + "\n")
 PY
 }
 
-if [ ! -f "${HERMES_REPO_CONFIG}" ] || [ ! -f "${OPENCLAW_REPO_CONFIG}" ] || [ ! -f "${LITELLM_AGENT_REPO_CONFIG}" ] || [ ! -f "${LITELLM_BENCHMARK_REPO_CONFIG}" ]; then
+if [ ! -f "${HERMES_REPO_CONFIG}" ] || [ ! -f "${OPENCLAW_REPO_CONFIG}" ] || [ ! -f "${LITELLM_AGENT_REPO_CONFIG}" ] || [ ! -f "${LITELLM_OFFLOAD_REPO_CONFIG}" ]; then
     err "Repo config files are missing. Run this from inside the spark-agents checkout."
     exit 1
 fi
@@ -148,7 +148,14 @@ mkdir -p "${RUNTIME_HERMES_DIR}" "${RUNTIME_OPENCLAW_DIR}"
 cp "${HERMES_REPO_CONFIG}" "${RUNTIME_HERMES_DIR}/cli-config.yaml"
 cp "${OPENCLAW_REPO_CONFIG}" "${RUNTIME_OPENCLAW_DIR}/config.json"
 cp "${LITELLM_AGENT_REPO_CONFIG}" "${LITELLM_AGENT_CONFIG}"
-cp "${LITELLM_BENCHMARK_REPO_CONFIG}" "${LITELLM_BENCHMARK_CONFIG}"
+cp "${LITELLM_OFFLOAD_REPO_CONFIG}" "${LITELLM_OFFLOAD_CONFIG}"
+
+if [ -f "${LITELLM_RUNTIME_DIR}/benchmark-mode.yaml" ]; then
+    rm -f "${LITELLM_RUNTIME_DIR}/benchmark-mode.yaml"
+fi
+if [ -f "${LITELLM_MODE_FILE}" ] && [ "$(cat "${LITELLM_MODE_FILE}")" = "benchmark-mode" ]; then
+    printf '%s\n' "offload-mode" > "${LITELLM_MODE_FILE}"
+fi
 log "Staged repo configs into ${SPARK_AGENTS_HOME}"
 
 section "2/7  Restarting LiteLLM"

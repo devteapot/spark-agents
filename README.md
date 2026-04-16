@@ -14,9 +14,9 @@ MBA (sloppy@sloppy-mba.local)
   OpenClaw /
 
 LiteLLM routes:
-  agent-mode     -> Spark vLLM SuperGemma (8001)
-                 -> Spark vLLM coder (8002)
-  benchmark-mode -> OpenRouter hosted models
+  agent-mode   -> Spark vLLM SuperGemma (8001)
+               -> Spark vLLM coder (8002)
+  offload-mode -> OpenRouter hosted models (Spark GPU free for other compute)
 ```
 
 Stable logical model IDs exposed to both agents:
@@ -34,9 +34,9 @@ Hidden cloud aliases stay available behind the router for hosted escape hatches:
 Spark-local models:
 
 - `AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4`
-- `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4`
+- `GadflyII/Qwen3-Coder-Next-NVFP4`
 
-Hosted benchmark-mode models:
+Hosted offload-mode models:
 
 - `openrouter/google/gemini-2.5-flash` for `general`
 - `openrouter/anthropic/claude-sonnet-4-5` for `coder`
@@ -77,7 +77,7 @@ spark-status.sh
 # Switch back to Spark-local serving
 spark-resume.sh
 
-# Free the Spark for direct benchmarking
+# Free the Spark GPU for non-agent compute (benchmarks, fine-tunes, etc.)
 spark-pause.sh
 ```
 
