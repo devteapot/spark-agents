@@ -23,7 +23,7 @@ echo "$$" > "${RESUME_LOCKFILE}"
 trap 'rm -f "${RESUME_LOCKFILE}"' EXIT
 
 log "Starting Spark vLLM via docker compose..."
-ssh "${SPARK_USER}@${SPARK_HOST}" "cd ${SPARK_COMPOSE_DIR} && sudo docker compose up -d"
+ssh "${SPARK_USER}@${SPARK_HOST}" "cd ${SPARK_COMPOSE_DIR} && docker compose up -d"
 
 log "Waiting for Spark SuperGemma vLLM..."
 wait_for_models_endpoint "${SPARK_SUPERGEMMA_V1_URL}" "Spark SuperGemma vLLM" 300

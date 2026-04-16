@@ -17,7 +17,7 @@ log "Switching LiteLLM to offload-mode first..."
 restart_litellm "offload-mode"
 
 log "Stopping Spark vLLM..."
-ssh "${SPARK_USER}@${SPARK_HOST}" "cd ${SPARK_COMPOSE_DIR} && sudo docker compose down"
+ssh "${SPARK_USER}@${SPARK_HOST}" "cd ${SPARK_COMPOSE_DIR} && docker compose down"
 
 echo ""
 log "Offload mode is active. Spark GPU is free for non-agent compute."
