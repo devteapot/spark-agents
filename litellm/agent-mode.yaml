@@ -8,6 +8,9 @@ model_list:
       model: openai/Qwen/Qwen3.6-35B-A3B-FP8
       api_base: http://192.168.1.96:8001/v1
       api_key: litellm-local
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
 
   - model_name: general-cloud
     litellm_params:
