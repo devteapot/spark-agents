@@ -51,15 +51,18 @@ Contract for future edits: pause/resume scripts should only flip LiteLLM mode an
 
 ### Model roles
 
-One stable logical model name is exposed to both agents through LiteLLM:
+Two logical model names are exposed to the agents through LiteLLM, both backed by the same Qwen3.6 vLLM container:
 
-- `general`
+- `general` — `chat_template_kwargs.enable_thinking: false`, fast tool-calling / instruct lane
+- `general-think` — `chat_template_kwargs.enable_thinking: true`, reasoning lane (emits `<think>…</think>`, parsed into `reasoning_content` by vLLM's `qwen3` reasoning parser)
 
 There is also a hidden hosted alias for explicit fallback:
 
 - `general-cloud`
 
-Both Hermes and OpenClaw use `general` for all tasks. OpenClaw falls back to `general-cloud` if the primary is unavailable.
+Both `general` and `general-think` share the same `--max-num-seqs 8` slot pool and KV cache on the Spark; there's no extra GPU memory cost. Agents pick by model name. Neither Hermes nor OpenClaw supports `chat_template_kwargs` passthrough to local endpoints, so the thinking policy lives in LiteLLM, not in agent requests.
+
+OpenClaw falls back to `general-cloud` if the primary is unavailable.
 
 ### Config deployment flow
 
