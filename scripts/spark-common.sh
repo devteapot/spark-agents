@@ -3,7 +3,7 @@
 SPARK_HOST="${SPARK_HOST:-slopinator-s-1.local}"
 SPARK_USER="${SPARK_USER:-carlid}"
 
-PATH="${HOME}/.local/bin:${HOME}/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
+PATH="${HOME}/.local/bin:${HOME}/bin:/opt/homebrew/bin:/usr/local/bin:/Applications/Docker.app/Contents/Resources/bin:${PATH}"
 export PATH
 
 SPARK_SUPERGEMMA_V1_URL="http://${SPARK_HOST}:8001/v1"
