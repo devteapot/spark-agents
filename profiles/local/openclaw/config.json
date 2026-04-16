@@ -1,0 +1,50 @@
+{
+  "$schema": "https://docs.openclaw.ai/schema/config.json",
+  "_comment": [
+    "OpenClaw Configuration — local Spark profile",
+    "Location after deploy: ~/.openclaw/config.json (on MBA: sloppy@sloppy-mba.local)",
+    "",
+    "Uses native Ollama API (not /v1) for reliable tool calling on the Spark.",
+    "Primary: Spark SuperGemma4 for general work.",
+    "Fallback 1: Spark Qwen3-Coder-Next for heavier coding turns.",
+    "Fallback 2+: OpenRouter hosted escape hatch (requires OPENROUTER_API_KEY in ~/.openclaw/.env)."
+  ],
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "spark-ollama": {
+        "baseUrl": "http://slopinator-s-1.local:11434",
+        "apiKey": "ollama-local",
+        "api": "ollama",
+        "models": [
+          {
+            "id": "supergemma4:26b-q8",
+            "name": "SuperGemma4 26B Q8 (General Intelligence)",
+            "reasoning": true,
+            "contextWindow": 8192,
+            "maxTokens": 4096
+          },
+          {
+            "id": "qwen3-coder-next:q6k",
+            "name": "Qwen3-Coder-Next Q6K (Coding Agent)",
+            "reasoning": true,
+            "contextWindow": 32768,
+            "maxTokens": 8192
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "spark-ollama/supergemma4:26b-q8",
+        "fallbacks": [
+          "spark-ollama/qwen3-coder-next:q6k",
+          "openrouter/anthropic/claude-sonnet-4-5",
+          "openrouter/auto"
+        ]
+      }
+    }
+  }
+}

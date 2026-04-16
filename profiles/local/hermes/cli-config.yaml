@@ -1,0 +1,88 @@
+# Hermes Agent Configuration — local Spark profile
+# Location after deploy: ~/.hermes/cli-config.yaml (on MBA: sloppy@sloppy-mba.local)
+#
+# Primary: Qwen3-Coder-Next on the Spark for code-heavy / complex work.
+# Cheap route: SuperGemma4 on the Spark for short, simple turns.
+# Emergency hosted fallback: OpenRouter (requires OPENROUTER_API_KEY in ~/.hermes/.env).
+
+# --- Provider: DGX Spark Ollama ---
+provider: custom
+model: qwen3-coder-next:q6k
+base_url: "http://slopinator-s-1.local:11434/v1"
+api_key: "ollama-local"
+
+# --- Model Aliases ---
+# Shortcuts for switching models via /model command
+model_aliases:
+  general:
+    model: "supergemma4:26b-q8"
+    provider: custom
+    base_url: "http://slopinator-s-1.local:11434/v1"
+    context_length: 8192
+    max_tokens: 4096
+
+  coder:
+    model: "qwen3-coder-next:q6k"
+    provider: custom
+    base_url: "http://slopinator-s-1.local:11434/v1"
+    context_length: 32768
+    max_tokens: 8192
+
+  cloud:
+    model: "anthropic/claude-sonnet-4-5"
+    provider: openrouter
+
+# --- Smart Model Routing ---
+# Keep Qwen for complex/code-heavy work, down-route quick/simple turns to SuperGemma.
+smart_model_routing:
+  enabled: true
+  max_simple_chars: 200
+  max_simple_words: 35
+  cheap_model:
+    provider: custom
+    model: "supergemma4:26b-q8"
+    base_url: "http://slopinator-s-1.local:11434/v1"
+    api_key: "ollama-local"
+
+# --- Fallback Model ---
+# If Spark is unavailable, Hermes can stay up on a hosted model instead of hard-failing.
+fallback_model:
+  provider: openrouter
+  model: "anthropic/claude-sonnet-4-5"
+
+# --- Agent Behavior ---
+autonomous: true
+
+# Skill creation — let Hermes learn from complex tasks
+skills:
+  auto_create: true
+  min_tool_calls: 5
+
+# Memory — persist across sessions
+memory:
+  enabled: true
+  provider: local
+
+# --- Tool Configuration ---
+tools:
+  enabled: true
+  # Add your tool configurations here, e.g.:
+  # web_search:
+  #   enabled: true
+  # file_system:
+  #   enabled: true
+  #   allowed_paths:
+  #     - /home/sloppy/projects
+  # shell:
+  #   enabled: true
+  #   allowed_commands: ["git", "npm", "python3", "cargo"]
+
+# --- Gateway / Messaging ---
+# Uncomment and configure the platforms you want Hermes to connect to
+# gateway:
+#   telegram:
+#     token: "YOUR_TELEGRAM_BOT_TOKEN"
+#   discord:
+#     token: "YOUR_DISCORD_BOT_TOKEN"
+#   slack:
+#     token: "YOUR_SLACK_BOT_TOKEN"

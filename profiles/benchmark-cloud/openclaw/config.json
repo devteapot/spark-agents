@@ -1,0 +1,22 @@
+{
+  "$schema": "https://docs.openclaw.ai/schema/config.json",
+  "_comment": [
+    "OpenClaw Configuration — benchmark-cloud profile",
+    "Location after deploy: ~/.openclaw/config.json (on MBA: sloppy@sloppy-mba.local)",
+    "",
+    "Use this profile when the Spark is reserved for direct benchmarking.",
+    "Primary: OpenRouter Claude Sonnet 4.5.",
+    "Fallback: OpenRouter auto routing.",
+    "Requires OPENROUTER_API_KEY in ~/.openclaw/.env."
+  ],
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openrouter/anthropic/claude-sonnet-4-5",
+        "fallbacks": [
+          "openrouter/auto"
+        ]
+      }
+    }
+  }
+}

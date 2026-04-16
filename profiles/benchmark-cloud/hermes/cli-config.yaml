@@ -1,0 +1,60 @@
+# Hermes Agent Configuration — benchmark-cloud profile
+# Location after deploy: ~/.hermes/cli-config.yaml (on MBA: sloppy@sloppy-mba.local)
+#
+# Use this profile when the Spark is reserved for direct benchmarking.
+# All inference stays hosted; no agent traffic should hit the Spark.
+# Requires OPENROUTER_API_KEY in ~/.hermes/.env.
+
+# --- Provider: OpenRouter ---
+provider: openrouter
+model: anthropic/claude-sonnet-4-5
+
+# --- Model Aliases ---
+model_aliases:
+  general:
+    model: "anthropic/claude-sonnet-4-5"
+    provider: openrouter
+
+  fast:
+    model: "google/gemini-2.5-flash"
+    provider: openrouter
+
+# --- Smart Model Routing ---
+# Keep the stronger hosted model for complex work and use the faster hosted model for quick turns.
+smart_model_routing:
+  enabled: true
+  max_simple_chars: 200
+  max_simple_words: 35
+  cheap_model:
+    provider: openrouter
+    model: "google/gemini-2.5-flash"
+
+# --- Fallback Model ---
+# Stay hosted even if the primary hosted model is unavailable.
+fallback_model:
+  provider: openrouter
+  model: "google/gemini-2.5-flash"
+
+# --- Agent Behavior ---
+autonomous: true
+
+skills:
+  auto_create: true
+  min_tool_calls: 5
+
+memory:
+  enabled: true
+  provider: local
+
+tools:
+  enabled: true
+
+# --- Gateway / Messaging ---
+# Uncomment and configure the platforms you want Hermes to connect to
+# gateway:
+#   telegram:
+#     token: "YOUR_TELEGRAM_BOT_TOKEN"
+#   discord:
+#     token: "YOUR_DISCORD_BOT_TOKEN"
+#   slack:
+#     token: "YOUR_SLACK_BOT_TOKEN"
