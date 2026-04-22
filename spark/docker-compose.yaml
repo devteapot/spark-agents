@@ -42,9 +42,9 @@ services:
       - --max-model-len
       - "262144"
       - --max-num-seqs
-      - "8"
+      - "32"
       - --max-num-batched-tokens
-      - "4192"
+      - "16384"
       - --gpu-memory-utilization
       - "0.92"
       - --trust-remote-code
