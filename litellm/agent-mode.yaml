@@ -23,7 +23,3 @@ model_list:
         chat_template_kwargs:
           enable_thinking: true
 
-  - model_name: general-cloud
-    litellm_params:
-      model: openrouter/google/gemini-2.5-flash
-      api_key: os.environ/OPENROUTER_API_KEY

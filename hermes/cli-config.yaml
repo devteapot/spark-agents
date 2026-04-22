@@ -68,12 +68,6 @@ compression:
 smart_model_routing:
   enabled: false
 
-fallback_model:
-  provider: custom
-  model: general-cloud
-  base_url: "http://127.0.0.1:4000/v1"
-  api_key: "litellm-local"
-
 agent:
   max_turns: 200
   reasoning_effort: "high"

@@ -29,13 +29,6 @@
             "reasoning": true,
             "contextWindow": 262144,
             "maxTokens": 4096
-          },
-          {
-            "id": "general-cloud",
-            "name": "LiteLLM hosted general fallback",
-            "reasoning": true,
-            "contextWindow": 262144,
-            "maxTokens": 4096
           }
         ]
       }
@@ -46,9 +39,7 @@
     "defaults": {
       "model": {
         "primary": "mba-litellm/general",
-        "fallbacks": [
-          "mba-litellm/general-cloud"
-        ]
+        "fallbacks": []
       }
     }
   }
