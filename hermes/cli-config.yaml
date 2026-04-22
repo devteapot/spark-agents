@@ -38,6 +38,7 @@ auxiliary:
     provider: custom
     base_url: "http://127.0.0.1:4000/v1"
     api_key: "litellm-local"
+    context_length: 262144
     timeout: 600
   session_search:
     model: general-think
@@ -57,7 +58,7 @@ auxiliary:
 
 compression:
   enabled: true
-  threshold: 0.50
+  threshold: 0.75
   target_ratio: 0.20
   protect_last_n: 20
   summary_model: general-think
