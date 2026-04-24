@@ -19,7 +19,7 @@ LITELLM_MODE_FILE="${LITELLM_RUNTIME_DIR}/current-mode"
 LITELLM_PID_FILE="${LITELLM_RUNTIME_DIR}/litellm.pid"
 LITELLM_LOG_FILE="${LITELLM_LOG_FILE:-/tmp/litellm.log}"
 
-QWEN_MODEL_ID="Qwen/Qwen3.6-35B-A3B-FP8"
+QWEN_MODEL_ID="Qwen3.6-27B-Q4_K_M.gguf"
 GENERAL_CLOUD_MODEL_ID="openrouter/google/gemini-2.5-flash"
 
 SPARK_COMPOSE_DIR="/home/${SPARK_USER}/spark-agents/spark"
