@@ -15,12 +15,8 @@ RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git /opt/llama.cpp
     cmake -B build -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release && \
     cmake --build build -j$(nproc)
 
-# Download Qwen3.6-27B GGUF models (done at build time)
-RUN pip install huggingface_hub && \
-    mkdir -p /models/27b-q4 && \
-    huggingface-cli download bartowski/Qwen_Qwen3.6-27B-GGUF \
-        "Qwen3.6-27B-Q4_K_M.gguf" \
-        --local-dir /models/27b-q4 2>/dev/null || true
+# The GGUF is bind-mounted from the host at runtime (see spark/docker-compose.yaml),
+# so the image does not bundle weights. spark-setup.sh downloads the model on the host.
 
 EXPOSE 8080
 ENTRYPOINT ["/opt/llama.cpp/build/bin/llama-server"]

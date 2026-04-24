@@ -16,7 +16,7 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODEL_DIR="/models/27b-q4"
-GGUF_REPO="bartowski/Qwen_Qwen3.6-27B-GGUF"
+GGUF_REPO="unsloth/Qwen3.6-27B-GGUF"
 GGUF_FILE="Qwen3.6-27B-Q4_K_M.gguf"
 LLAMA_IMAGE="spark-agents/llama-cpp-cuda:local"
 LLAMA_DOCKERFILE="docker/llama-cpp-cuda.Dockerfile"
