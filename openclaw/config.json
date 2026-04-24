@@ -5,7 +5,7 @@
     "Location after deploy: ~/.openclaw/config.json (on MBA: sloppy@sloppy-mba.local)",
     "",
     "OpenClaw talks only to the local LiteLLM router on the MBA.",
-    "Aliases: general (thinking off), general-think (thinking on).",
+    "Models all route to the single Qwen3.6-27B dense via llama.cpp on Spark.",
     "Hidden cloud alias remains available as hosted fallback."
   ],
 
@@ -13,29 +13,22 @@
     "providers": {
       "mba-litellm": {
         "baseUrl": "http://127.0.0.1:4000/v1",
-        "apiKey": "litellm-local",
+        "apiKey": "***",
         "api": "openai-completions",
         "models": [
           {
             "id": "general",
-            "name": "LiteLLM general route (thinking off)",
+            "name": "LiteLLM Qwen3.6-27B (non-thinking)",
             "reasoning": false,
             "contextWindow": 262144,
-            "maxTokens": 4096
-          },
-          {
-            "id": "general-think",
-            "name": "LiteLLM general route (thinking on)",
-            "reasoning": true,
-            "contextWindow": 262144,
-            "maxTokens": 4096
+            "maxTokens": 32768
           },
           {
             "id": "fast",
-            "name": "LiteLLM fast route (Qwen3.6-27B Q4, llama.cpp)",
+            "name": "LiteLLM Qwen3.6-27B (non-thinking)",
             "reasoning": false,
-            "contextWindow": 131072,
-            "maxTokens": 8192
+            "contextWindow": 262144,
+            "maxTokens": 32768
           }
         ]
       }
@@ -45,7 +38,7 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "mba-litellm/general",
+        "primary": "mba-litellm/fast",
         "fallbacks": []
       }
     }
