@@ -46,7 +46,7 @@ services:
       - --max-num-batched-tokens
       - "16384"
       - --gpu-memory-utilization
-      - "0.92"
+      - "0.80"
       - --trust-remote-code
       - --enable-chunked-prefill
       - --enable-prefix-caching
