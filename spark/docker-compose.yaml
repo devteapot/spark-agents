@@ -46,7 +46,7 @@ services:
       - --max-num-batched-tokens
       - "16384"
       - --gpu-memory-utilization
-      - "0.92"
+      - "0.85"
       - --trust-remote-code
       - --enable-chunked-prefill
       - --enable-prefix-caching
@@ -88,7 +88,7 @@ services:
       - "--cache-type-v"
       - "q8_0"
       - "--ctx-size"
-      - "262144"
+      - "65536"
       - "--n-gpu-layers"
       - "99"
       - "--no-mmap"
