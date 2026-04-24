@@ -29,6 +29,13 @@
             "reasoning": true,
             "contextWindow": 262144,
             "maxTokens": 4096
+          },
+          {
+            "id": "fast",
+            "name": "LiteLLM fast route (Qwen3.6-27B Q4, llama.cpp)",
+            "reasoning": false,
+            "contextWindow": 131072,
+            "maxTokens": 8192
           }
         ]
       }
