@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git /opt/llama.cpp && \
     cd /opt/llama.cpp && \
     cmake -B build -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build build --release -j$(nproc)
+    cmake --build build -j$(nproc)
 
 # Download Qwen3.6-27B GGUF models (done at build time)
 RUN pip install huggingface_hub && \
