@@ -22,13 +22,6 @@
             "reasoning": false,
             "contextWindow": 262144,
             "maxTokens": 32768
-          },
-          {
-            "id": "fast",
-            "name": "LiteLLM Qwen3.6-27B (non-thinking)",
-            "reasoning": false,
-            "contextWindow": 262144,
-            "maxTokens": 32768
           }
         ]
       }
@@ -38,7 +31,7 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "mba-litellm/fast",
+        "primary": "mba-litellm/general",
         "fallbacks": []
       }
     }

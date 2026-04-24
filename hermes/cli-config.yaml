@@ -2,18 +2,18 @@
 # Location after deploy: ~/.hermes/config.yaml (on MBA: sloppy@sloppy-mba.local)
 #
 # Hermes talks only to the local LiteLLM router. The router owns mode switching:
-#   - agent-mode   -> llama.cpp on Spark for `fast`
+#   - agent-mode   -> llama.cpp on Spark for `general`
 #   - offload-mode -> hosted OpenRouter models (Spark GPU free for other compute)
 
 model:
-  default: fast
+  default: general
   provider: custom
   base_url: "http://127.0.0.1:4000/v1"
   api_key: "litellm-local"
   context_length: 262144
 
 delegation:
-  model: fast
+  model: general
   provider: custom
   base_url: "http://127.0.0.1:4000/v1"
   api_key: "litellm-local"
@@ -22,36 +22,36 @@ delegation:
 
 auxiliary:
   vision:
-    model: fast
+    model: general
     provider: custom
     base_url: "http://127.0.0.1:4000/v1"
     api_key: "litellm-local"
     timeout: 120
   web_extract:
-    model: fast
+    model: general
     provider: custom
     base_url: "http://127.0.0.1:4000/v1"
     api_key: "litellm-local"
     timeout: 600
   compression:
-    model: fast
+    model: general
     provider: custom
     base_url: "http://127.0.0.1:4000/v1"
     api_key: "litellm-local"
     context_length: 262144
     timeout: 600
   session_search:
-    model: fast
+    model: general
     provider: custom
     base_url: "http://127.0.0.1:4000/v1"
     api_key: "litellm-local"
   flush_memories:
-    model: fast
+    model: general
     provider: custom
     base_url: "http://127.0.0.1:4000/v1"
     api_key: "litellm-local"
   approval:
-    model: fast
+    model: general
     provider: custom
     base_url: "http://127.0.0.1:4000/v1"
     api_key: "litellm-local"
@@ -61,7 +61,7 @@ compression:
   threshold: 0.75
   target_ratio: 0.20
   protect_last_n: 20
-  summary_model: fast
+  summary_model: general
   summary_provider: custom
   summary_base_url: "http://127.0.0.1:4000/v1"
 
