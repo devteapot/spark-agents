@@ -10,11 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Build llama.cpp with CUDA for GB10 (SM 12.1).
-# libcuda.so ships with the NVIDIA driver (host-side), not the CUDA toolkit, so
-# it isn't present at docker-build time. Point the linker at the toolkit's stub
-# so executables can link; the real libcuda.so is injected by the NVIDIA
-# container runtime at container-start time.
-ENV LIBRARY_PATH=/usr/local/cuda/lib64/stubs:${LIBRARY_PATH}
+# libcuda.so ships with the NVIDIA driver (host-side), not the CUDA toolkit,
+# so it isn't present at docker-build time. Symlink the toolkit's stub into
+# lib64 so the linker can resolve cuMem*/cuDevice* references; the real
+# libcuda.so is injected by the NVIDIA container runtime at container-start
+# time and takes precedence via ldconfig there.
+RUN ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/libcuda.so && \
+    ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/libcuda.so.1
 
 RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git /opt/llama.cpp && \
     cd /opt/llama.cpp && \
