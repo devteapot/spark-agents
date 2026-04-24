@@ -5,7 +5,7 @@
 #   1. Install hf (huggingface-hub CLI) via pipx if needed
 #   2. Validate Docker + NVIDIA container runtime availability
 #   3. Create /models/27b-q4 and download Qwen3.6-27B-Q4_K_M.gguf
-#   4. Build the spark-agents/llama-cpp-cuda:local image
+#   4. Pull the upstream ghcr.io/ggml-org/llama.cpp:server-cuda image
 #   5. Remove legacy vLLM containers (keeps their images on disk for rollback)
 #
 # Usage:
@@ -14,12 +14,10 @@
 
 set -euo pipefail
 
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODEL_DIR="/models/27b-q4"
 GGUF_REPO="unsloth/Qwen3.6-27B-GGUF"
 GGUF_FILE="Qwen3.6-27B-Q4_K_M.gguf"
-LLAMA_IMAGE="spark-agents/llama-cpp-cuda:local"
-LLAMA_DOCKERFILE="docker/llama-cpp-cuda.Dockerfile"
+LLAMA_IMAGE="ghcr.io/ggml-org/llama.cpp:server-cuda"
 SYSTEMD_DIR="/etc/systemd/system"
 DOCKER_BIN="$(command -v docker || true)"
 
@@ -32,7 +30,7 @@ log()  { echo -e "${GREEN}[spark-setup]${NC} $*"; }
 warn() { echo -e "${YELLOW}[spark-setup]${NC} $*"; }
 err()  { echo -e "${RED}[spark-setup]${NC} $*" >&2; }
 
-log "This script needs sudo for /models and Docker image builds."
+log "This script needs sudo for /models and to clean up legacy containers/units."
 sudo -v
 
 if ! command -v python3 > /dev/null 2>&1; then
@@ -49,13 +47,15 @@ log "Ensuring system prerequisites are installed..."
 sudo apt-get update -qq
 sudo apt-get install -y curl python3-venv pipx
 
-if ! sudo "${DOCKER_BIN}" info > /dev/null 2>&1; then
-    err "docker is installed but not usable with sudo on the Spark."
+if ! "${DOCKER_BIN}" info > /dev/null 2>&1; then
+    err "docker is installed but not usable for the current user. Add the user to the 'docker' group."
     exit 1
 fi
 
-if ! sudo "${DOCKER_BIN}" info --format '{{json .Runtimes}}' | grep -q '"nvidia"'; then
-    warn "Docker does not report an 'nvidia' runtime. GPU containers may fail until the NVIDIA container runtime is configured."
+if ! "${DOCKER_BIN}" info --format '{{json .Runtimes}}' | grep -q '"nvidia"'; then
+    warn "Docker does not report an 'nvidia' runtime. Run:"
+    warn "    sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker"
+    warn "GPU containers will fall back to CPU until this is configured."
 fi
 
 if command -v hf > /dev/null 2>&1; then
@@ -84,18 +84,14 @@ else
         --local-dir "${MODEL_DIR}"
 fi
 
-log "Building ${LLAMA_IMAGE} from ${LLAMA_DOCKERFILE}..."
-sudo "${DOCKER_BIN}" build \
-    --network host \
-    -t "${LLAMA_IMAGE}" \
-    -f "${PROJECT_DIR}/${LLAMA_DOCKERFILE}" \
-    "${PROJECT_DIR}"
+log "Pulling ${LLAMA_IMAGE}..."
+"${DOCKER_BIN}" pull "${LLAMA_IMAGE}"
 
 # Stop + remove legacy vLLM containers (images stay on disk for rollback).
 for legacy_container in spark-vllm-qwen spark-vllm-supergemma spark-vllm-coder; do
-    if sudo "${DOCKER_BIN}" ps -a --format '{{.Names}}' | grep -qx "${legacy_container}"; then
+    if "${DOCKER_BIN}" ps -a --format '{{.Names}}' | grep -qx "${legacy_container}"; then
         log "Removing legacy container ${legacy_container}..."
-        sudo "${DOCKER_BIN}" rm -f "${legacy_container}" > /dev/null
+        "${DOCKER_BIN}" rm -f "${legacy_container}" > /dev/null
     fi
 done
 
@@ -113,7 +109,6 @@ echo ""
 log "Setup complete."
 log "  Model path:       ${MODEL_DIR}/${GGUF_FILE}"
 log "  llama.cpp image:  ${LLAMA_IMAGE}"
-log "  Compose file:     ${PROJECT_DIR}/spark/docker-compose.yaml"
 log ""
 log "Next steps:"
 log "  1. On MBA, run:  ./scripts/mba-deploy.sh   (staging + LiteLLM)"

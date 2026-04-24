@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is **not** an application. It is a configuration + deployment repo for a two-machine agent setup:
 
-- **DGX Spark** (`carlid@slopinator-s-1.local`, IP `192.168.1.96`) — runs a single `llama.cpp CUDA` service via Docker Compose. Uses CUDA 13.2 + llama.cpp built with `-DGGML_CUDA=ON` for native SM 12.1 (GB10 Blackwell) support:
+- **DGX Spark** (`carlid@slopinator-s-1.local`, IP `192.168.1.96`) — runs a single `llama.cpp CUDA` service via Docker Compose using the upstream `ghcr.io/ggml-org/llama.cpp:server-cuda` image (arm64, CUDA 12.8). SM 12.1 (GB10 Blackwell) is reached via PTX JIT at first model load:
   - Qwen3.6-27B Q4_K_M on `:8001` (~17.5 GB weights, Q8_0 KV cache, parallel=24)
 - **MacBook Air** (`sloppy@sloppy-mba.local`) — runs Hermes, OpenClaw, and a local `LiteLLM` router on `127.0.0.1:4000`
 
@@ -88,9 +88,11 @@ Resume/pause scripts SSH to the Spark and run `docker compose up -d` / `docker c
 
 ### Docker images
 
-One image, built by `spark-setup.sh`:
+- **`ghcr.io/ggml-org/llama.cpp:server-cuda`** — upstream official image (org: `ggml-org`, multi-arch incl. `arm64`). CUDA 12.8.1 base. Built without an explicit `CMAKE_CUDA_ARCHITECTURES`, so SM 12.1 (GB10) is reached via PTX JIT at first load. `spark-setup.sh` just `docker pull`s this image; nothing is built locally.
 
-- **`spark-agents/llama-cpp-cuda:local`** — CUDA 13.2 base, builds llama.cpp with `-DGGML_CUDA=ON`, downloads Qwen3.6-27B-Q4_K_M.gguf (~17.5 GB) at build time.
+### NVIDIA container runtime on the Spark
+
+One-time setup (requires sudo): `sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker`. Without the `nvidia` runtime registered with the daemon, `docker info` lists only `runc` and compose's `deploy.resources.reservations.devices[driver=nvidia]` silently falls back to CPU. Symptom: llama.cpp logs `ggml_cuda_init: failed to initialize CUDA: CUDA driver is a stub library` and decode crawls at ~5 tok/s.
 
 ### Legacy images (no longer built)
 

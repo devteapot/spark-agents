@@ -1,6 +1,6 @@
 services:
   llama-cpp-27b:
-    image: spark-agents/llama-cpp-cuda:local
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
     container_name: spark-llama-cpp-27b
     restart: unless-stopped
     network_mode: host
