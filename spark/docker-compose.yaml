@@ -1,9 +1,14 @@
 services:
-  llama-cpp-27b:
-    image: ghcr.io/ggml-org/llama.cpp:server-cuda
-    container_name: spark-llama-cpp-27b
+  vllm-qwen:
+    image: spark-agents/vllm-qwen:local
+    container_name: spark-vllm-qwen
     restart: unless-stopped
     network_mode: host
+    ipc: host
+    shm_size: "16g"
+    ulimits:
+      memlock: -1
+      stack: 67108864
     deploy:
       resources:
         reservations:
@@ -11,38 +16,47 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    environment:
+      - HF_HOME=/root/.cache/huggingface
+      - HUGGINGFACE_HUB_CACHE=/root/.cache/huggingface/hub
+      - VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
     volumes:
-      - /models/27b-q4:/models/27b-q4:ro
+      - /srv/models/qwen3.6-35b-a3b-fp8:/models/qwen:ro
+      - /srv/spark-agents/cache/qwen:/root/.cache
     command:
-      - "-m"
-      - "/models/27b-q4/Qwen3.6-27B-Q4_K_M.gguf"
-      - "--host"
+      - vllm
+      - serve
+      - /models/qwen
+      - --host
       - "0.0.0.0"
-      - "--port"
+      - --port
       - "8001"
-      - "--ctx-size"
-      - "524288"
-      - "--cache-type-k"
-      - "q8_0"
-      - "--cache-type-v"
-      - "q8_0"
-      - "--n-gpu-layers"
-      - "99"
-      - "--no-mmap"
-      - "--jinja"
-      - "--parallel"
-      - "4"
-      - "--temp"
-      - "0.6"
-      - "--top-p"
-      - "0.95"
-      - "--top-k"
-      - "20"
-      - "--reasoning-budget"
-      - "0"
-      - "--log-disable"
+      - --served-model-name
+      - Qwen/Qwen3.6-35B-A3B-FP8
+      - --dtype
+      - auto
+      - --kv-cache-dtype
+      - fp8
+      - --tensor-parallel-size
+      - "1"
+      - --max-model-len
+      - "262144"
+      - --max-num-seqs
+      - "32"
+      - --max-num-batched-tokens
+      - "16384"
+      - --gpu-memory-utilization
+      - "0.85"
+      - --trust-remote-code
+      - --enable-chunked-prefill
+      - --enable-prefix-caching
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - qwen3_xml
+      - --reasoning-parser
+      - qwen3
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8001/health || exit 1"]
+      test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8001/v1/models\", timeout=3)'"]
       interval: 30s
       timeout: 10s
       retries: 3

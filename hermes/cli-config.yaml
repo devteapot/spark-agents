@@ -2,7 +2,7 @@
 # Location after deploy: ~/.hermes/config.yaml (on MBA: sloppy@sloppy-mba.local)
 #
 # Hermes talks only to the local LiteLLM router. The router owns mode switching:
-#   - agent-mode   -> llama.cpp on Spark for `general`
+#   - agent-mode   -> Spark vLLM for `general`
 #   - offload-mode -> hosted OpenRouter models (Spark GPU free for other compute)
 
 model:
@@ -13,7 +13,7 @@ model:
   context_length: 262144
 
 delegation:
-  model: general
+  model: general-think
   provider: custom
   base_url: "http://127.0.0.1:4000/v1"
   api_key: "litellm-local"
@@ -34,7 +34,7 @@ auxiliary:
     api_key: "litellm-local"
     timeout: 600
   compression:
-    model: general
+    model: general-think
     provider: custom
     base_url: "http://127.0.0.1:4000/v1"
     api_key: "litellm-local"
@@ -61,7 +61,7 @@ compression:
   threshold: 0.75
   target_ratio: 0.20
   protect_last_n: 20
-  summary_model: general
+  summary_model: general-think
   summary_provider: custom
   summary_base_url: "http://127.0.0.1:4000/v1"
 

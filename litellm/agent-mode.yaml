@@ -5,19 +5,20 @@ litellm_settings:
 model_list:
   - model_name: general
     litellm_params:
-      model: openai/Qwen/Qwen3.6-27B
+      model: openai/Qwen/Qwen3.6-35B-A3B-FP8
       api_base: http://192.168.1.96:8001/v1
-      api_key: llama-llm
+      api_key: litellm-local
       timeout: 300
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
 
   - model_name: general-think
     litellm_params:
-      model: openai/Qwen/Qwen3.6-27B
+      model: openai/Qwen/Qwen3.6-35B-A3B-FP8
       api_base: http://192.168.1.96:8001/v1
-      api_key: llama-llm
+      api_key: litellm-local
       timeout: 900
-
-  - model_name: general-cloud
-    litellm_params:
-      model: openrouter/google/gemini-2.5-flash
-      api_key: os.environ/OPENROUTER_API_KEY
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: true
