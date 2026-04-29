@@ -5,7 +5,7 @@ Three-node home lab infrastructure for running local LLMs with agent integration
 | Node | Host | GPU | Role |
 |------|------|-----|------|
 | **DGX Spark** | `carlid@slopinator-s-1.local` | GB10 (128 GiB) | vLLM serving — Qwen3.6-35B-A3B FP8 |
-| **New Node** | `carlid@slopinator-n1` | RTX 3090 (24 GiB) | Reserved for future dense/MoE models |
+| **New Node** | `carlid@slopinator-n-1` | RTX 3090 (24 GiB) | Reserved for future dense/MoE models |
 | **MacBook Air** | `sloppy@sloppy-mba.local` | — | Hermes, OpenClaw, LiteLLM router |
 
 ## Architecture
