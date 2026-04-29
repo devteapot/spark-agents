@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# spark-resume.sh - Start Spark vLLM via docker compose and switch LiteLLM to agent-mode
+# lab-resume.sh - Start Spark vLLM via docker compose and switch LiteLLM to agent-mode
 
 set -euo pipefail
 
-SCRIPT_LABEL="spark-resume"
+SCRIPT_LABEL="lab-resume"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/spark-common.sh"
+source "${SCRIPT_DIR}/lab-common.sh"
 
 require_command curl
 require_command ssh
@@ -14,9 +14,9 @@ require_command python3
 ensure_runtime_dirs
 ensure_litellm_installed
 
-RESUME_LOCKFILE="${SPARK_AGENTS_HOME}/spark-resume.pid"
+RESUME_LOCKFILE="${SPARK_AGENTS_HOME}/lab-resume.pid"
 if [ -f "${RESUME_LOCKFILE}" ] && kill -0 "$(cat "${RESUME_LOCKFILE}" 2>/dev/null)" 2>/dev/null; then
-    err "Another spark-resume is already running (PID $(cat "${RESUME_LOCKFILE}")). Refusing to re-enter; this prevents SIGKILLing an in-flight model load."
+    err "Another lab-resume is already running (PID $(cat "${RESUME_LOCKFILE}")). Refusing to re-enter; this prevents SIGKILLing an in-flight model load."
     exit 1
 fi
 echo "$$" > "${RESUME_LOCKFILE}"

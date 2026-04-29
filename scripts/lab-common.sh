@@ -10,8 +10,8 @@ SPARK_QWEN_V1_URL="http://${SPARK_HOST}:8001/v1"
 LITELLM_BASE_URL="${LITELLM_BASE_URL:-http://127.0.0.1:4000}"
 LITELLM_V1_URL="${LITELLM_V1_URL:-${LITELLM_BASE_URL}/v1}"
 
-SPARK_AGENTS_HOME="${HOME}/.spark-agents"
-LITELLM_RUNTIME_DIR="${SPARK_AGENTS_HOME}/litellm"
+HOME_LAB_HOME="${HOME}/.home-lab"
+LITELLM_RUNTIME_DIR="${HOME_LAB_HOME}/litellm"
 LITELLM_ACTIVE_CONFIG="${LITELLM_RUNTIME_DIR}/config.yaml"
 LITELLM_AGENT_CONFIG="${LITELLM_RUNTIME_DIR}/agent-mode.yaml"
 LITELLM_OFFLOAD_CONFIG="${LITELLM_RUNTIME_DIR}/offload-mode.yaml"
@@ -22,9 +22,9 @@ LITELLM_LOG_FILE="${LITELLM_LOG_FILE:-/tmp/litellm.log}"
 QWEN_MODEL_ID="Qwen/Qwen3.6-35B-A3B-FP8"
 GENERAL_CLOUD_MODEL_ID="openrouter/google/gemini-2.5-flash"
 
-SPARK_COMPOSE_DIR="/home/${SPARK_USER}/spark-agents/spark"
+SPARK_COMPOSE_DIR="/home/${SPARK_USER}/home-lab/spark"
 
-SCRIPT_LABEL="${SCRIPT_LABEL:-spark}"
+SCRIPT_LABEL="${SCRIPT_LABEL:-lab}"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -46,7 +46,7 @@ require_command() {
 }
 
 ensure_runtime_dirs() {
-    mkdir -p "${SPARK_AGENTS_HOME}" "${LITELLM_RUNTIME_DIR}"
+    mkdir -p "${HOME_LAB_HOME}" "${LITELLM_RUNTIME_DIR}"
 }
 
 read_env_value() {
@@ -85,7 +85,7 @@ resolve_openrouter_api_key() {
 
     local env_file
     for env_file in \
-        "${SPARK_AGENTS_HOME}/litellm.env" \
+        "${HOME_LAB_HOME}/litellm.env" \
         "${HOME}/.hermes/.env" \
         "${HOME}/.openclaw/.env"
     do
@@ -100,7 +100,7 @@ resolve_openrouter_api_key() {
 require_openrouter_api_key() {
     local key
     key="$(resolve_openrouter_api_key)" || {
-        err "OPENROUTER_API_KEY not found. Checked \$OPENROUTER_API_KEY, ${SPARK_AGENTS_HOME}/litellm.env, ~/.hermes/.env, and ~/.openclaw/.env."
+        err "OPENROUTER_API_KEY not found. Checked \$OPENROUTER_API_KEY, ${HOME_LAB_HOME}/litellm.env, ~/.hermes/.env, and ~/.openclaw/.env."
         return 1
     }
 
@@ -125,7 +125,7 @@ _litellm_compose_file() {
     fi
 
     local candidates=(
-        "${SPARK_AGENTS_HOME}/litellm/docker-compose.yaml"
+        "${HOME_LAB_HOME}/litellm/docker-compose.yaml"
         "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)/litellm/docker-compose.yaml"
     )
     for f in "${candidates[@]}"; do
@@ -140,18 +140,18 @@ _litellm_compose_file() {
 }
 
 litellm_is_running() {
-    docker container inspect spark-litellm > /dev/null 2>&1 && \
-        [ "$(docker container inspect -f '{{.State.Running}}' spark-litellm 2>/dev/null)" = "true" ]
+    docker container inspect home-lab-litellm > /dev/null 2>&1 && \
+        [ "$(docker container inspect -f '{{.State.Running}}' home-lab-litellm 2>/dev/null)" = "true" ]
 }
 
 stop_litellm() {
-    if ! docker container inspect spark-litellm > /dev/null 2>&1; then
+    if ! docker container inspect home-lab-litellm > /dev/null 2>&1; then
         return 0
     fi
 
     log "Stopping LiteLLM container..."
-    docker stop spark-litellm > /dev/null 2>&1 || true
-    docker rm spark-litellm > /dev/null 2>&1 || true
+    docker stop home-lab-litellm > /dev/null 2>&1 || true
+    docker rm home-lab-litellm > /dev/null 2>&1 || true
 
     # Clean up any legacy bare-process litellm
     pkill -9 -f "litellm --config" 2>/dev/null || true
@@ -309,7 +309,7 @@ restart_litellm() {
 
     wait_for_models_endpoint "${LITELLM_V1_URL}" "LiteLLM" 30 || {
         err "LiteLLM container logs:"
-        docker logs spark-litellm --tail 30 2>&1 || true
+        docker logs home-lab-litellm --tail 30 2>&1 || true
         return 1
     }
 }

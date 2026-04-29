@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# spark-status.sh - Health check for LiteLLM, Spark vLLM, and agent processes
+# lab-status.sh - Health check for LiteLLM, Spark vLLM, and agent processes
 
 set -uo pipefail
 
-SCRIPT_LABEL="spark-status"
+SCRIPT_LABEL="lab-status"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/spark-common.sh"
+source "${SCRIPT_DIR}/lab-common.sh"
 
 require_command curl
 

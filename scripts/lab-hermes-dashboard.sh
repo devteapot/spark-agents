@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# spark-hermes-dashboard.sh — Launch the Hermes dashboard on the MBA for LAN access
+# lab-hermes-dashboard.sh — Launch the Hermes dashboard on the MBA for LAN access
 #
-# Run this on the MBA after spark-resume.sh when you want the Hermes web UI
+# Run this on the MBA after lab-resume.sh when you want the Hermes web UI
 # reachable from other devices on your local network.
 #
 # WARNING:
@@ -10,7 +10,7 @@
 #   and person on that network.
 #
 # Usage:
-#   spark-hermes-dashboard.sh
+#   lab-hermes-dashboard.sh
 
 set -euo pipefail
 

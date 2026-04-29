@@ -1,7 +1,7 @@
 services:
   vllm-qwen:
-    image: spark-agents/vllm-qwen:local
-    container_name: spark-vllm-qwen
+    image: home-lab/vllm-qwen:local
+    container_name: home-lab-vllm-qwen
     restart: unless-stopped
     network_mode: host
     ipc: host
@@ -22,7 +22,7 @@ services:
       - VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
     volumes:
       - /srv/models/qwen3.6-35b-a3b-fp8:/models/qwen:ro
-      - /srv/spark-agents/cache/qwen:/root/.cache
+      - /srv/home-lab/cache/qwen:/root/.cache
     command:
       - vllm
       - serve

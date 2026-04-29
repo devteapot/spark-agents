@@ -2,14 +2,14 @@
 # mba-deploy.sh - Deploy the always-on MBA side of the stack
 #
 # Run this on the MBA from inside the repo checkout. It will:
-#   1. Stage Hermes, OpenClaw, and LiteLLM configs into ~/.spark-agents
+#   1. Stage Hermes, OpenClaw, and LiteLLM configs into ~/.home-lab
 #   2. Copy the live agent configs into ~/.hermes and ~/.openclaw
 #   3. Ensure LiteLLM is installed and restart it in the active mode
 #   4. Restart Hermes and OpenClaw once so they pick up the new router-backed configs
 #   5. Install the operational scripts into ~/bin
 #
 # Usage:
-#   cd spark-agents
+#   cd home-lab
 #   ./scripts/mba-deploy.sh
 
 set -euo pipefail
@@ -17,7 +17,7 @@ set -euo pipefail
 SCRIPT_LABEL="deploy"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-source "${SCRIPT_DIR}/spark-common.sh"
+source "${SCRIPT_DIR}/lab-common.sh"
 
 HERMES_REPO_CONFIG="${PROJECT_DIR}/hermes/cli-config.yaml"
 OPENCLAW_REPO_CONFIG="${PROJECT_DIR}/openclaw/config.json"
@@ -136,7 +136,7 @@ PY
 }
 
 if [ ! -f "${HERMES_REPO_CONFIG}" ] || [ ! -f "${OPENCLAW_REPO_CONFIG}" ] || [ ! -f "${LITELLM_AGENT_REPO_CONFIG}" ] || [ ! -f "${LITELLM_OFFLOAD_REPO_CONFIG}" ]; then
-    err "Repo config files are missing. Run this from inside the spark-agents checkout."
+    err "Repo config files are missing. Run this from inside the home-lab checkout."
     exit 1
 fi
 
@@ -226,7 +226,7 @@ start_process_if_needed "openclaw" "openclaw gateway run" "/tmp/openclaw.log"
 
 section "7/7  Installing operational scripts"
 mkdir -p "${HOME}/bin"
-for script in spark-common.sh spark-pause.sh spark-resume.sh spark-status.sh; do
+for script in lab-common.sh lab-pause.sh lab-resume.sh lab-status.sh; do
     cp "${PROJECT_DIR}/scripts/${script}" "${HOME}/bin/${script}"
     chmod +x "${HOME}/bin/${script}"
 done
@@ -237,7 +237,7 @@ if [[ ":$PATH:" != *":${HOME}/bin:"* ]]; then
     [ -f "${SHELL_RC}" ] || SHELL_RC="${HOME}/.bashrc"
     if ! grep -q 'export PATH="$HOME/bin:$PATH"' "${SHELL_RC}" 2>/dev/null; then
         echo 'export PATH="$HOME/bin:$PATH"' >> "${SHELL_RC}"
-        warn "Added ~/bin to PATH in ${SHELL_RC}. Open a new shell or source it before using spark-*.sh."
+        warn "Added ~/bin to PATH in ${SHELL_RC}. Open a new shell or source it before using lab-*.sh."
     fi
 fi
 
@@ -251,7 +251,7 @@ echo "  OpenClaw gateway:  http://0.0.0.0:18789/"
 echo "  LiteLLM configs:   ${LITELLM_RUNTIME_DIR}"
 echo ""
 echo "  Next steps:"
-echo "    1. On Spark: run ./scripts/spark-setup.sh once"
-echo "    2. For local serving: spark-resume.sh"
-echo "    3. For benchmarking:  spark-pause.sh"
-echo "    4. Check health:      spark-status.sh"
+echo "    1. On Spark: run ./scripts/lab-setup.sh once"
+echo "    2. For local serving: lab-resume.sh"
+echo "    3. For benchmarking:  lab-pause.sh"
+echo "    4. Check health:      lab-status.sh"

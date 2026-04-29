@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=spark-agents/vllm-base:cu132
+ARG BASE_IMAGE=home-lab/vllm-base:cu132
 FROM ${BASE_IMAGE}
 
 ENV VLLM_ALLOW_LONG_MAX_MODEL_LEN=1

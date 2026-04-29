@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# spark-pause.sh - Switch LiteLLM to hosted routing, then stop Spark vLLM
+# lab-pause.sh - Switch LiteLLM to hosted routing, then stop Spark vLLM
 
 set -euo pipefail
 
-SCRIPT_LABEL="spark-pause"
+SCRIPT_LABEL="lab-pause"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/spark-common.sh"
+source "${SCRIPT_DIR}/lab-common.sh"
 
 require_command ssh
 

@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=spark-agents/vllm-base:cu132
+ARG BASE_IMAGE=home-lab/vllm-base:cu132
 FROM ${BASE_IMAGE}
 
 ARG GEMMA4_PATCH_URL=https://huggingface.co/bg-digitalservices/Gemma-4-26B-A4B-it-NVFP4/resolve/main/gemma4_patched.py

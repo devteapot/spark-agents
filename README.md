@@ -1,9 +1,12 @@
-# spark-agents
+# home-lab
 
-Two-machine agent infrastructure with:
+Three-node home lab infrastructure for running local LLMs with agent integration:
 
-- **DGX Spark** (GB10, 128 GiB unified memory) running a local `vLLM` model server via Docker Compose on CUDA 13.2 + vLLM 0.19.1 + PyTorch 2.11 with native SM121 support
-- **MacBook Air** running Hermes, OpenClaw, and a local `LiteLLM` router
+| Node | Host | IP | GPU | Role |
+|------|------|-----|-----|------|
+| **DGX Spark** | `carlid@slopinator-s-1.local` | `192.168.1.96` | GB10 (128 GiB) | vLLM serving — Qwen3.6-35B-A3B FP8 |
+| **New Node** | `carlid@slopinator-n1` | `192.168.1.48` | RTX 3090 (24 GiB) | Reserved for future dense/MoE models |
+| **MacBook Air** | `sloppy@sloppy-mba.local` | LAN | — | Hermes, OpenClaw, LiteLLM router |
 
 ## Architecture
 
@@ -45,44 +48,44 @@ Hosted offload-mode model:
 ### Spark (one-time)
 
 ```bash
-git clone git@github.com:devteapot/spark-agents.git ~/spark-agents
-cd ~/spark-agents
-sudo ./scripts/spark-setup.sh
+git clone git@github.com:devteapot/home-lab.git ~/home-lab
+cd ~/home-lab
+sudo ./scripts/lab-setup.sh
 ```
 
-This downloads the SuperGemma model repo under `/srv/models`, builds the vLLM container images, and migrates any legacy systemd units.
+This downloads models under `/srv/models`, builds the vLLM container images, and migrates any legacy systemd units.
 
 ### MBA (one-time or after config/script edits)
 
 ```bash
-git clone git@github.com:devteapot/spark-agents.git ~/spark-agents
-cd ~/spark-agents
+git clone git@github.com:devteapot/home-lab.git ~/dev/home-lab
+cd ~/dev/home-lab
 ./scripts/mba-deploy.sh
 ```
 
-This stages the configs into `~/.spark-agents`, restarts local `LiteLLM`, copies the live configs into `~/.hermes` and `~/.openclaw`, and restarts both agents once.
+This stages the configs into `~/.home-lab`, restarts local `LiteLLM`, copies the live configs into `~/.hermes` and `~/.openclaw`, and restarts both agents once.
 
 ## Daily Workflow
 
 ```bash
 # Check router, Spark service, and agent processes
-spark-status.sh
+lab-status.sh
 
 # Switch back to Spark-local serving
-spark-resume.sh
+lab-resume.sh
 
 # Free the Spark GPU for non-agent compute (benchmarks, fine-tunes, etc.)
-spark-pause.sh
+lab-pause.sh
 ```
 
-`spark-pause.sh` and `spark-resume.sh` do not restart Hermes or OpenClaw. They only flip LiteLLM mode and start/stop the Spark vLLM service.
+`lab-pause.sh` and `lab-resume.sh` do not restart Hermes or OpenClaw. They only flip LiteLLM mode and start/stop the Spark vLLM service.
 
 ## Credentials
 
 Hosted routing needs `OPENROUTER_API_KEY`. The scripts look for it in this order:
 
 1. `$OPENROUTER_API_KEY`
-2. `~/.spark-agents/litellm.env`
+2. `~/.home-lab/litellm.env`
 3. `~/.hermes/.env`
 4. `~/.openclaw/.env`
 
@@ -109,6 +112,6 @@ If the MBA-side configs or scripts changed, rerun:
 If the Spark-side compose file changed, pull on the Spark and restart:
 
 ```bash
-cd ~/spark-agents && git pull
+cd ~/home-lab && git pull
 cd spark && docker compose down && docker compose up -d
 ```

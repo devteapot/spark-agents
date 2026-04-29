@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# spark-setup.sh - Initial Spark setup for local vLLM serving
+# lab-setup.sh - Initial Spark setup for local vLLM serving
 #
 # Run this on the DGX Spark once. It will:
 #   1. Install hf (huggingface-hub CLI) via pipx if needed
 #   2. Validate Docker + NVIDIA container runtime availability
 #   3. Create /srv/models and download the SuperGemma HF model repo
 #   4. Build the Spark-side vLLM container images
-#   5. Install the docker-compose.yaml into /srv/spark-agents
+#   5. Install the docker-compose.yaml into /srv/home-lab
 #
 # Usage:
 #   ssh carlid@slopinator-s-1.local
-#   cd ~/spark-agents && sudo ./scripts/spark-setup.sh
+#   cd ~/home-lab && sudo ./scripts/lab-setup.sh
 
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODEL_DIR="/srv/models"
-STATE_DIR="/srv/spark-agents"
+STATE_DIR="/srv/home-lab"
 SUPERGEMMA_DIR="${MODEL_DIR}/supergemma4-nvfp4"
 SUPERGEMMA_CACHE_DIR="${STATE_DIR}/cache/supergemma"
 SYSTEMD_DIR="/etc/systemd/system"
@@ -24,21 +24,21 @@ DOCKER_BIN="$(command -v docker || true)"
 SUPERGEMMA_MODEL_REPO="AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4"
 MODELOPT_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/modelopt_patched.py"
 SERVING_PATCH_URL="https://raw.githubusercontent.com/AEON-7/supergemma4-26b-abliterated-multimodal-nvfp4/main/serving_chat_patched.py"
-VLLM_BASE_IMAGE="spark-agents/vllm-base:cu132"
-SUPERGEMMA_IMAGE="spark-agents/vllm-supergemma:local"
+VLLM_BASE_IMAGE="home-lab/vllm-base:cu132"
+SUPERGEMMA_IMAGE="home-lab/vllm-supergemma:local"
 QWEN_DIR="${MODEL_DIR}/qwen3.6-35b-a3b-fp8"
 QWEN_CACHE_DIR="${STATE_DIR}/cache/qwen"
 QWEN_MODEL_REPO="Qwen/Qwen3.6-35B-A3B-FP8"
-QWEN_IMAGE="spark-agents/vllm-qwen:local"
+QWEN_IMAGE="home-lab/vllm-qwen:local"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-log()  { echo -e "${GREEN}[spark-setup]${NC} $*"; }
-warn() { echo -e "${YELLOW}[spark-setup]${NC} $*"; }
-err()  { echo -e "${RED}[spark-setup]${NC} $*" >&2; }
+log()  { echo -e "${GREEN}[lab-setup]${NC} $*"; }
+warn() { echo -e "${YELLOW}[lab-setup]${NC} $*"; }
+err()  { echo -e "${RED}[lab-setup]${NC} $*" >&2; }
 
 build_image() {
     local image="$1"
@@ -161,5 +161,5 @@ log "  Qwen image:           ${QWEN_IMAGE}"
 log ""
 log "Next steps:"
 log "  1. On MBA, run:    ./scripts/mba-deploy.sh"
-log "  2. On MBA, run:    spark-resume.sh   (starts Spark vLLM)"
-log "  3. Anytime:        spark-status.sh"
+log "  2. On MBA, run:    lab-resume.sh   (starts Spark vLLM)"
+log "  3. Anytime:        lab-status.sh"
