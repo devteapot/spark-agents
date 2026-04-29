@@ -1,42 +1,115 @@
+# =============================================================================
+# Qwen3.6-27B on n-1 (single RTX 3090, 24 GB).
+#
+# Stack: vLLM dev205 + Sandermage Genesis v7.14 patches + TurboQuant 3-bit KV
+#        + MTP n=3 speculative decoding + vision tower.
+#
+# Ported from noonghunna/qwen36-27b-single-3090 (upstream "default" compose).
+# Defaults: 48K context, 0.92 mem-util — sits below both prefill-activation
+# cliffs on a 24 GB card (GDN forward at ~50-60K, TurboQuant tool-prefill at
+# high mem_util). Engine rejects oversized requests with HTTP 400 instead of
+# OOM-crashing.
+#
+# Run with:
+#   bash ../scripts/setup.sh    # clones Genesis tree, downloads model
+#   cd vllm && docker compose up -d   # or `podman compose up -d` on n-1
+#
+# Variant matrix (see upstream README for full caveats):
+#   48K  + 0.92  ⭐ default — all features safe, all verify-full.sh checks pass
+#   64K  + 0.92     up to ~50K single prompts safe
+#   128K + 0.95     up to ~40K tool prefill
+#   205K + 0.98 + --language-model-only   text-only frontier
+# =============================================================================
 services:
-  vllm:
-    image: vllm/vllm-openai:latest
+  vllm-qwen36-27b:
+    image: vllm/vllm-openai:nightly-07351e0883470724dd5a7e9730ed10e01fc99d08
     container_name: vllm-qwen36-27b
-    user: "0"
-    ipc: host
-    shm_size: 32gb
-    runtime: nvidia
-    devices:
-      - /dev/nvidia0:/dev/nvidia0
-      - /dev/nvidiactl:/dev/nvidiactl
-      - /dev/nvidia-uvm:/dev/nvidia-uvm
+    restart: "no"
     ports:
       - "8020:8000"
+    volumes:
+      - ${MODEL_DIR:-../models}:/root/.cache/huggingface
+      # Genesis v7.14 modular package (mounted into vLLM's site-packages).
+      - ../patches/genesis/vllm/_genesis:/usr/local/lib/python3.12/dist-packages/vllm/_genesis:ro
+      # Standalone .tolist() cudagraph capture fix — separate bug from P65.
+      - ../patches/patch_tolist_cudagraph.py:/patches/patch_tolist_cudagraph.py:ro
     environment:
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      - NVIDIA_VISIBLE_DEVICES=all
+      # Uncomment to pin to a specific GPU (n-1 only has one, but harmless):
+      # - CUDA_VISIBLE_DEVICES=0
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+      - VLLM_WORKER_MULTIPROC_METHOD=spawn
+      - NCCL_CUMEM_ENABLE=0
+      - NCCL_P2P_DISABLE=1
+      - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
+      - VLLM_NO_USAGE_STATS=1
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:512
+      - VLLM_FLOAT32_MATMUL_PRECISION=high
+      - VLLM_USE_FLASHINFER_SAMPLER=1
+      - OMP_NUM_THREADS=1
+      - CUDA_DEVICE_MAX_CONNECTIONS=8
+      - VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
+      - VLLM_MARLIN_USE_ATOMIC_ADD=1
+      # Genesis v7.14 opt-in patches — required for correctness under
+      # MTP × TurboQuant × cudagraph (closes vllm-project/vllm#40880).
+      - GENESIS_ENABLE_P65_TURBOQUANT_SPEC_CG_DOWNGRADE=1
+      - GENESIS_ENABLE_P66_CUDAGRAPH_SIZE_FILTER=1
+      - GENESIS_ENABLE_P64_QWEN3CODER_MTP_STREAMING=1
+      - GENESIS_ENABLE_P68_AUTO_FORCE_TOOL=1
+      - GENESIS_ENABLE_P69_LONG_CTX_TOOL_REMINDER=1
+    shm_size: "16gb"
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        pip install xxhash pandas scipy -q
+        python3 -m vllm._genesis.patches.apply_all
+        python3 /patches/patch_tolist_cudagraph.py
+        exec vllm serve "$@"
+      - --
     command:
-      - Lorbus/Qwen3.6-27B-int4-AutoRound
-      - --host
-      - "0.0.0.0"
-      - --port
-      - "8000"
-      - --max-model-len
-      - "8192"
-      - --gpu-memory-utilization
-      - "0.90"
+      - --model
+      - /root/.cache/huggingface/qwen3.6-27b-autoround-int4
+      - --served-model-name
+      - qwen3.6-27b-autoround
+      - --quantization
+      - auto_round
       - --dtype
-      - "auto"
-      - --enable-prefix-caching
-      - --enable-chunked-prefill
+      - float16
+      - --tensor-parallel-size
+      - "1"
+      - --max-model-len
+      - "48000"
+      - --gpu-memory-utilization
+      - "0.92"
+      - --max-num-seqs
+      - "1"
       - --max-num-batched-tokens
-      - "4096"
+      - "4128"
+      - --kv-cache-dtype
+      - turboquant_3bit_nc
+      # For 205K text-only frontier, uncomment and bump max-model-len + mem-util:
+      #- --language-model-only
+      - --trust-remote-code
       - --reasoning-parser
       - qwen3
       - --enable-auto-tool-choice
       - --tool-call-parser
       - qwen3_coder
-      - --quantization
-      - awq
-      - --compilation-config
-      - '{"cudagraph_mode":"none"}'
+      - --enable-prefix-caching
+      - --enable-chunked-prefill
+      - --no-scheduler-reserve-full-isl
+      - --speculative-config
+      - '{"method":"mtp","num_speculative_tokens":3}'
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"

@@ -15,14 +15,20 @@ n-1:
 vllm:
   port: 8020
   model: Lorbus/Qwen3.6-27B-int4-AutoRound
-  quant: AWQ INT4
-  backend: vLLM v0.20.0
+  quant: AutoRound INT4 (BF16 mtp.fc preserved)
+  backend: vLLM nightly dev205 (07351e08) + Sandermage Genesis v7.14 patches
   config:
-    max_model_len: 8192
-    gpu_memory_utilization: 0.90
-    cudagraph_mode: none
+    max_model_len: 48000
+    gpu_memory_utilization: 0.92
+    kv_cache_dtype: turboquant_3bit_nc
+    speculative_decoding: MTP n=3
     enable_prefix_caching: true
     enable_chunked_prefill: true
+    vision: enabled (MoonViT BF16)
   performance:
-    throughput: ~75 tok/s (single 3090)
-    vram_used: ~23GB / 24GB
+    throughput: ~51 narrative / ~67 code tok/s
+    vram_used: ~21GB / 24GB
+  notes: |
+    Sits below both prefill cliffs (GDN forward ~50-60K, TQ tool-prefill at high mem_util).
+    Oversized requests get HTTP 400, not OOM crashes. See vllm/docker-compose.yaml header
+    for the variant matrix (64K/128K/192K/205K) and trade-offs.
