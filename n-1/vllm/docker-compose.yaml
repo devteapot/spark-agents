@@ -1,0 +1,42 @@
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm-qwen36-27b
+    user: "0"
+    ipc: host
+    shm_size: 32gb
+    runtime: nvidia
+    devices:
+      - /dev/nvidia0:/dev/nvidia0
+      - /dev/nvidiactl:/dev/nvidiactl
+      - /dev/nvidia-uvm:/dev/nvidia-uvm
+    ports:
+      - "8020:8000"
+    environment:
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - NVIDIA_VISIBLE_DEVICES=all
+    command:
+      - Lorbus/Qwen3.6-27B-int4-AutoRound
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --max-model-len
+      - "8192"
+      - --gpu-memory-utilization
+      - "0.90"
+      - --dtype
+      - "auto"
+      - --enable-prefix-caching
+      - --enable-chunked-prefill
+      - --max-num-batched-tokens
+      - "4096"
+      - --reasoning-parser
+      - qwen3
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - qwen3_coder
+      - --quantization
+      - awq
+      - --compilation-config
+      - '{"cudagraph_mode":"none"}'

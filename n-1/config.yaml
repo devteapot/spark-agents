@@ -1,0 +1,28 @@
+n-1:
+  ip: 192.168.1.48
+  hostname: slopinator-n-1
+  user: carlid
+  role: inference-node
+  specs:
+    cpu: AMD Ryzen 5 7600X (12-core)
+    ram: 32GB DDR5
+    gpu: NVIDIA RTX 3090 (24GB)
+    os: Fedora 44
+    cuda: 13.2
+    podman: 5.8.2
+  note: Uses root podman (not rootless) for NVIDIA GPU passthrough
+
+vllm:
+  port: 8020
+  model: Lorbus/Qwen3.6-27B-int4-AutoRound
+  quant: AWQ INT4
+  backend: vLLM v0.20.0
+  config:
+    max_model_len: 8192
+    gpu_memory_utilization: 0.90
+    cudagraph_mode: none
+    enable_prefix_caching: true
+    enable_chunked_prefill: true
+  performance:
+    throughput: ~75 tok/s (single 3090)
+    vram_used: ~23GB / 24GB
