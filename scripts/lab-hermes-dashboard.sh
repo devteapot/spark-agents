@@ -64,9 +64,9 @@ PID=$!
 
 sleep 2
 
-if curl -sf "http://127.0.0.1:${PORT}/" > /dev/null 2>&1; then
+if curl -sf "http://localhost:${PORT}/" > /dev/null 2>&1; then
     log "Hermes dashboard started (PID ${PID})."
-    echo "  Local: http://127.0.0.1:${PORT}/"
+    echo "  Local: http://localhost:${PORT}/"
     echo "  LAN:   http://$(local_hostname):${PORT}/"
     if IP_ADDR="$(local_ipv4)"; then
         echo "  IP:    http://${IP_ADDR}:${PORT}/"

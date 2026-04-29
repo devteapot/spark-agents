@@ -6,11 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is **not** an application. It is a configuration + deployment repo for a three-node home lab agent setup:
 
-| Node | Alias | Host | IP | Role |
-|------|-------|------|-----|------|
-| **DGX Spark** | Spark | `carlid@slopinator-s-1.local` | `192.168.1.96` | vLLM serving — Qwen3.6-35B-A3B FP8 (GB10, 128 GiB) |
-| **New Node** | n1 | `carlid@slopinator-n1` | `192.168.1.48` | Reserved for future dense/MoE models (RTX 3090, 24 GiB) |
-| **MacBook Air** | MBA | `sloppy@sloppy-mba.local` | LAN | Hermes, OpenClaw, LiteLLM router on `127.0.0.1:4000` |
+| Node | Host | Role |
+|------|------|------|
+| **DGX Spark** | Spark | vLLM serving — Qwen3.6-35B-A3B FP8 (GB10, 128 GiB) |
+| **New Node** | n1 | Reserved for future dense/MoE models (RTX 3090, 24 GiB) |
+| **MacBook Air** | MBA | Hermes, OpenClaw, LiteLLM router on `localhost:4000` |
 
 GPU memory budget on Spark: Qwen3.6 FP8 at `0.92` of the GB10's 128 GiB unified memory (~118 GiB), with 256K context (`--max-model-len 262144`), fp8 KV cache, and 8 concurrent request slots (`--max-num-seqs 8`). SuperGemma4 NVFP4 model and image are also kept on disk for potential swap-back.
 
@@ -94,5 +94,5 @@ Three images, all built by `lab-setup.sh`:
 ### LiteLLM notes
 
 - `litellm_settings.ssl_verify` must be `false`. Earlier LiteLLM versions needed `~` (YAML null) but the current version creates an SSL context from `None`, breaking plain HTTP connections. `false` correctly disables SSL for `http://` endpoints.
-- The Spark `api_base` URLs use the static IP (`192.168.1.96`) rather than mDNS (`slopinator-s-1.local`) because Python's asyncio resolver does not support `.local` mDNS on macOS.
+- The Spark `api_base` URL (`http://slopinator-s-1.local:8001/v1`) uses the `.local` hostname, but the LitellM container uses the static IP (`192.168.1.96`) because Python's asyncio resolver on macOS does not support `.local` mDNS reliably.
 - The LiteLLM router runs in a Docker container on the MBA with `network_mode: host`. Docker Desktop's "Enable host networking" setting must be enabled for the container to reach the Spark's LAN IP.

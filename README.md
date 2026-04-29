@@ -2,18 +2,18 @@
 
 Three-node home lab infrastructure for running local LLMs with agent integration:
 
-| Node | Host | IP | GPU | Role |
-|------|------|-----|-----|------|
-| **DGX Spark** | `carlid@slopinator-s-1.local` | `192.168.1.96` | GB10 (128 GiB) | vLLM serving — Qwen3.6-35B-A3B FP8 |
-| **New Node** | `carlid@slopinator-n1` | `192.168.1.48` | RTX 3090 (24 GiB) | Reserved for future dense/MoE models |
-| **MacBook Air** | `sloppy@sloppy-mba.local` | LAN | — | Hermes, OpenClaw, LiteLLM router |
+| Node | Host | GPU | Role |
+|------|------|-----|------|
+| **DGX Spark** | `carlid@slopinator-s-1.local` | GB10 (128 GiB) | vLLM serving — Qwen3.6-35B-A3B FP8 |
+| **New Node** | `carlid@slopinator-n1` | RTX 3090 (24 GiB) | Reserved for future dense/MoE models |
+| **MacBook Air** | `sloppy@sloppy-mba.local` | — | Hermes, OpenClaw, LiteLLM router |
 
 ## Architecture
 
 ```text
 MBA (sloppy@sloppy-mba.local)
   Hermes   \
-            -> LiteLLM (127.0.0.1:4000/v1)
+            -> LiteLLM (localhost:4000/v1)
   OpenClaw /
 
 LiteLLM routes:

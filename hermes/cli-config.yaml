@@ -8,14 +8,14 @@
 model:
   default: general
   provider: custom
-  base_url: "http://127.0.0.1:4000/v1"
+  base_url: "http://localhost:4000/v1"
   api_key: "litellm-local"
   context_length: 262144
 
 delegation:
   model: general-think
   provider: custom
-  base_url: "http://127.0.0.1:4000/v1"
+  base_url: "http://localhost:4000/v1"
   api_key: "litellm-local"
   max_iterations: 80
   default_toolsets: ["terminal", "file"]
@@ -24,36 +24,36 @@ auxiliary:
   vision:
     model: general
     provider: custom
-    base_url: "http://127.0.0.1:4000/v1"
+    base_url: "http://localhost:4000/v1"
     api_key: "litellm-local"
     timeout: 120
   web_extract:
     model: general
     provider: custom
-    base_url: "http://127.0.0.1:4000/v1"
+    base_url: "http://localhost:4000/v1"
     api_key: "litellm-local"
     timeout: 600
   compression:
     model: general-think
     provider: custom
-    base_url: "http://127.0.0.1:4000/v1"
+    base_url: "http://localhost:4000/v1"
     api_key: "litellm-local"
     context_length: 262144
     timeout: 600
   session_search:
     model: general
     provider: custom
-    base_url: "http://127.0.0.1:4000/v1"
+    base_url: "http://localhost:4000/v1"
     api_key: "litellm-local"
   flush_memories:
     model: general
     provider: custom
-    base_url: "http://127.0.0.1:4000/v1"
+    base_url: "http://localhost:4000/v1"
     api_key: "litellm-local"
   approval:
     model: general
     provider: custom
-    base_url: "http://127.0.0.1:4000/v1"
+    base_url: "http://localhost:4000/v1"
     api_key: "litellm-local"
 
 compression:
@@ -63,7 +63,7 @@ compression:
   protect_last_n: 20
   summary_model: general-think
   summary_provider: custom
-  summary_base_url: "http://127.0.0.1:4000/v1"
+  summary_base_url: "http://localhost:4000/v1"
 
 smart_model_routing:
   enabled: false

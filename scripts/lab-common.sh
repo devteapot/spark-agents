@@ -7,7 +7,7 @@ PATH="${HOME}/.local/bin:${HOME}/bin:/opt/homebrew/bin:/usr/local/bin:/Applicati
 export PATH
 
 SPARK_QWEN_V1_URL="http://${SPARK_HOST}:8001/v1"
-LITELLM_BASE_URL="${LITELLM_BASE_URL:-http://127.0.0.1:4000}"
+LITELLM_BASE_URL="${LITELLM_BASE_URL:-http://localhost:4000}"
 LITELLM_V1_URL="${LITELLM_V1_URL:-${LITELLM_BASE_URL}/v1}"
 
 HOME_LAB_HOME="${HOME}/.home-lab"
